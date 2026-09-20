@@ -19,6 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.payment import Payment
     from app.models.session_participation import SessionParticipation
     from app.models.user import User
 
@@ -94,4 +95,8 @@ class OutingSession(Base):
 
     participations: Mapped[list[SessionParticipation]] = relationship(
         back_populates="session",
+    )
+    
+    payments: Mapped[list[Payment]] = relationship(
+    back_populates="session",
     )

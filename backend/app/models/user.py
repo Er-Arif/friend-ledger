@@ -11,6 +11,8 @@ from app.db.base import Base
 
 if TYPE_CHECKING:
     from app.models.auth_session import AuthSession
+    from app.models.payment import Payment
+    from app.models.payment_share import PaymentShare
     from app.models.session import OutingSession
     from app.models.session_participation import SessionParticipation
 
@@ -82,6 +84,10 @@ class User(Base):
         onupdate=func.now(),
     )
 
+    auth_sessions: Mapped[list[AuthSession]] = relationship(
+        back_populates="user",
+    )
+
     created_sessions: Mapped[list[OutingSession]] = relationship(
         back_populates="creator",
     )
@@ -89,7 +95,12 @@ class User(Base):
     participations: Mapped[list[SessionParticipation]] = relationship(
         back_populates="user",
     )
-    
-    auth_sessions: Mapped[list[AuthSession]] = relationship(
-    back_populates="user",
+
+    paid_payments: Mapped[list[Payment]] = relationship(
+        foreign_keys="Payment.payer_user_id",
+        back_populates="payer",
+    )
+
+    payment_shares: Mapped[list[PaymentShare]] = relationship(
+        back_populates="user",
     )
