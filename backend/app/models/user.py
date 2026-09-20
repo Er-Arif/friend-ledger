@@ -10,6 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 if TYPE_CHECKING:
+    from app.models.auth_session import AuthSession
     from app.models.session import OutingSession
     from app.models.session_participation import SessionParticipation
 
@@ -87,4 +88,8 @@ class User(Base):
 
     participations: Mapped[list[SessionParticipation]] = relationship(
         back_populates="user",
+    )
+    
+    auth_sessions: Mapped[list[AuthSession]] = relationship(
+    back_populates="user",
     )
