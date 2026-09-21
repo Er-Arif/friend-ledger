@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
@@ -38,7 +39,9 @@ def create_unique_join_code(db: Session) -> str:
         if existing is None:
             return code
 
-    raise RuntimeError("Unable to generate a unique join code")
+    raise RuntimeError(
+        "Unable to generate a unique join code"
+    )
 
 
 def create_outing(
@@ -46,7 +49,10 @@ def create_outing(
     *,
     user: User,
     name: str | None,
-) -> tuple[OutingSession, SessionParticipation]:
+) -> tuple[
+    OutingSession,
+    SessionParticipation,
+]:
     outing = OutingSession(
         name=name,
         join_code=create_unique_join_code(db),
@@ -75,12 +81,20 @@ def join_outing(
     *,
     user: User,
     join_code: str,
-) -> tuple[OutingSession, SessionParticipation]:
-    normalized_code = normalize_join_code(join_code)
+) -> tuple[
+    OutingSession,
+    SessionParticipation,
+]:
+    normalized_code = normalize_join_code(
+        join_code
+    )
 
     outing = db.scalar(
         select(OutingSession)
-        .where(OutingSession.join_code == normalized_code)
+        .where(
+            OutingSession.join_code
+            == normalized_code
+        )
         .with_for_update()
     )
 
@@ -100,8 +114,10 @@ def join_outing(
 
     active_participation = db.scalar(
         select(SessionParticipation).where(
-            SessionParticipation.session_id == outing.id,
-            SessionParticipation.user_id == user.id,
+            SessionParticipation.session_id
+            == outing.id,
+            SessionParticipation.user_id
+            == user.id,
             SessionParticipation.left_at.is_(None),
         )
     )
@@ -109,7 +125,10 @@ def join_outing(
     if active_participation is not None:
         raise AppError(
             code="ALREADY_ACTIVE_PARTICIPANT",
-            message="You are already participating in this outing.",
+            message=(
+                "You are already participating "
+                "in this outing."
+            ),
             status_code=409,
         )
 
@@ -118,8 +137,44 @@ def join_outing(
         user_id=user.id,
     )
 
-    db.add(participation)
-    db.flush()
+    try:
+        with db.begin_nested():
+            db.add(participation)
+            db.flush()
+
+    except IntegrityError as exc:
+        active_participation = db.scalar(
+            select(SessionParticipation).where(
+                SessionParticipation.session_id
+                == outing.id,
+                SessionParticipation.user_id
+                == user.id,
+                SessionParticipation.left_at.is_(
+                    None
+                ),
+            )
+        )
+
+        if active_participation is not None:
+            raise AppError(
+                code=(
+                    "ALREADY_ACTIVE_PARTICIPANT"
+                ),
+                message=(
+                    "You are already participating "
+                    "in this outing."
+                ),
+                status_code=409,
+            ) from exc
+
+        raise AppError(
+            code="SESSION_JOIN_CONFLICT",
+            message=(
+                "The outing could not be joined "
+                "because of a concurrent change."
+            ),
+            status_code=409,
+        ) from exc
 
     db.refresh(participation)
 
@@ -135,8 +190,10 @@ def has_participated(
     participation_id = db.scalar(
         select(SessionParticipation.id)
         .where(
-            SessionParticipation.session_id == session_id,
-            SessionParticipation.user_id == user_id,
+            SessionParticipation.session_id
+            == session_id,
+            SessionParticipation.user_id
+            == user_id,
         )
         .limit(1)
     )
@@ -150,7 +207,10 @@ def get_outing_for_user(
     session_id: UUID,
     user: User,
 ) -> OutingSession:
-    outing = db.get(OutingSession, session_id)
+    outing = db.get(
+        OutingSession,
+        session_id,
+    )
 
     if outing is None or not has_participated(
         db,
@@ -174,8 +234,10 @@ def is_active_participant(
 ) -> bool:
     participation_id = db.scalar(
         select(SessionParticipation.id).where(
-            SessionParticipation.session_id == session_id,
-            SessionParticipation.user_id == user_id,
+            SessionParticipation.session_id
+            == session_id,
+            SessionParticipation.user_id
+            == user_id,
             SessionParticipation.left_at.is_(None),
         )
     )
@@ -187,15 +249,25 @@ def get_active_participants(
     db: Session,
     *,
     session_id: UUID,
-) -> list[tuple[SessionParticipation, User]]:
+) -> list[
+    tuple[
+        SessionParticipation,
+        User,
+    ]
+]:
     result = db.execute(
-        select(SessionParticipation, User)
+        select(
+            SessionParticipation,
+            User,
+        )
         .join(
             User,
-            User.id == SessionParticipation.user_id,
+            User.id
+            == SessionParticipation.user_id,
         )
         .where(
-            SessionParticipation.session_id == session_id,
+            SessionParticipation.session_id
+            == session_id,
             SessionParticipation.left_at.is_(None),
         )
         .order_by(
@@ -216,7 +288,8 @@ def count_active_participants(
         select(func.count())
         .select_from(SessionParticipation)
         .where(
-            SessionParticipation.session_id == session_id,
+            SessionParticipation.session_id
+            == session_id,
             SessionParticipation.left_at.is_(None),
         )
     )
@@ -233,13 +306,17 @@ def list_user_outings(
         select(OutingSession)
         .join(
             SessionParticipation,
-            SessionParticipation.session_id == OutingSession.id,
+            SessionParticipation.session_id
+            == OutingSession.id,
         )
         .where(
-            SessionParticipation.user_id == user.id,
+            SessionParticipation.user_id
+            == user.id,
         )
         .distinct()
-        .order_by(OutingSession.created_at.desc())
+        .order_by(
+            OutingSession.created_at.desc()
+        )
     )
 
     return list(outings)
@@ -250,10 +327,15 @@ def leave_outing(
     *,
     session_id: UUID,
     user: User,
-) -> tuple[SessionParticipation, OutingSession]:
+) -> tuple[
+    SessionParticipation,
+    OutingSession,
+]:
     outing = db.scalar(
         select(OutingSession)
-        .where(OutingSession.id == session_id)
+        .where(
+            OutingSession.id == session_id
+        )
         .with_for_update()
     )
 
@@ -274,8 +356,10 @@ def leave_outing(
     participation = db.scalar(
         select(SessionParticipation)
         .where(
-            SessionParticipation.session_id == session_id,
-            SessionParticipation.user_id == user.id,
+            SessionParticipation.session_id
+            == session_id,
+            SessionParticipation.user_id
+            == user.id,
             SessionParticipation.left_at.is_(None),
         )
         .with_for_update()
@@ -284,7 +368,10 @@ def leave_outing(
     if participation is None:
         raise AppError(
             code="NOT_ACTIVE_PARTICIPANT",
-            message="You are not currently participating in this outing.",
+            message=(
+                "You are not currently "
+                "participating in this outing."
+            ),
             status_code=409,
         )
 
@@ -319,7 +406,9 @@ def finish_outing(
 ) -> OutingSession:
     outing = db.scalar(
         select(OutingSession)
-        .where(OutingSession.id == session_id)
+        .where(
+            OutingSession.id == session_id
+        )
         .with_for_update()
     )
 
@@ -340,8 +429,10 @@ def finish_outing(
     participation = db.scalar(
         select(SessionParticipation)
         .where(
-            SessionParticipation.session_id == session_id,
-            SessionParticipation.user_id == user.id,
+            SessionParticipation.session_id
+            == session_id,
+            SessionParticipation.user_id
+            == user.id,
             SessionParticipation.left_at.is_(None),
         )
         .with_for_update()
@@ -350,7 +441,10 @@ def finish_outing(
     if participation is None:
         raise AppError(
             code="NOT_ACTIVE_PARTICIPANT",
-            message="You are not currently participating in this outing.",
+            message=(
+                "You are not currently "
+                "participating in this outing."
+            ),
             status_code=409,
         )
 
@@ -363,8 +457,9 @@ def finish_outing(
         raise AppError(
             code="SESSION_FINISH_NOT_ALLOWED",
             message=(
-                "This outing can only be finished when "
-                "you are the final active participant."
+                "This outing can only be finished "
+                "when you are the final active "
+                "participant."
             ),
             status_code=409,
         )
@@ -376,6 +471,8 @@ def finish_outing(
     outing.closed_at = now
 
     db.flush()
+
+    db.refresh(participation)
     db.refresh(outing)
 
     return outing

@@ -38,18 +38,21 @@ def begin_idempotent_operation(
     idempotency_key: str,
     request_hash: str,
 ) -> IdempotencyRecord:
-    existing = db.scalar(
-        select(IdempotencyRecord)
-        .where(
-            IdempotencyRecord.user_id == user_id,
-            IdempotencyRecord.operation == operation,
-            IdempotencyRecord.idempotency_key
-            == idempotency_key,
+    def get_existing() -> IdempotencyRecord | None:
+        return db.scalar(
+            select(IdempotencyRecord)
+            .where(
+                IdempotencyRecord.user_id == user_id,
+                IdempotencyRecord.operation == operation,
+                IdempotencyRecord.idempotency_key
+                == idempotency_key,
+            )
+            .with_for_update()
         )
-        .with_for_update()
-    )
 
-    if existing is not None:
+    def resolve_existing(
+        existing: IdempotencyRecord,
+    ) -> IdempotencyRecord:
         if existing.request_hash != request_hash:
             raise AppError(
                 code="IDEMPOTENCY_KEY_REUSED",
@@ -72,6 +75,11 @@ def begin_idempotent_operation(
             status_code=409,
         )
 
+    existing = get_existing()
+
+    if existing is not None:
+        return resolve_existing(existing)
+
     now = datetime.now(UTC)
 
     record = IdempotencyRecord(
@@ -81,25 +89,32 @@ def begin_idempotent_operation(
         request_hash=request_hash,
         state="IN_PROGRESS",
         expires_at=(
-            now + timedelta(hours=IDEMPOTENCY_TTL_HOURS)
+            now
+            + timedelta(
+                hours=IDEMPOTENCY_TTL_HOURS,
+            )
         ),
     )
 
-    db.add(record)
-
     try:
-        db.flush()
-    except IntegrityError as exc:
-        db.rollback()
+        with db.begin_nested():
+            db.add(record)
+            db.flush()
 
-        raise AppError(
-            code="IDEMPOTENCY_CONFLICT",
-            message=(
-                "Another request with this idempotency key "
-                "is already being processed."
-            ),
-            status_code=409,
-        ) from exc
+    except IntegrityError as exc:
+        existing = get_existing()
+
+        if existing is None:
+            raise AppError(
+                code="IDEMPOTENCY_CONFLICT",
+                message=(
+                    "Another request with this "
+                    "idempotency key conflicted."
+                ),
+                status_code=409,
+            ) from exc
+
+        return resolve_existing(existing)
 
     return record
 

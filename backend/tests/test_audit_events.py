@@ -628,3 +628,71 @@ def test_logout_records_audit_event(
     )
 
     assert event is not None
+
+
+def test_audit_metadata_contains_no_sensitive_auth_values(
+    client: TestClient,
+    db_session,
+) -> None:
+    # 1. Register
+    account = create_account(
+        client,
+        name="Arif",
+        username="arif_sensitive_test",
+    )
+    user_id = account["user"]["id"]
+
+    # 2. Login
+    login_resp = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": "arif_sensitive_test",
+            "password": PASSWORD,
+        },
+    )
+    assert login_resp.status_code == 200
+
+    # 3. Refresh
+    refresh_resp = client.post(
+        "/api/v1/auth/refresh",
+        json={
+            "refresh_token": login_resp.json()["refresh_token"],
+        },
+    )
+    assert refresh_resp.status_code == 200
+
+    # 4. Logout
+    logout_resp = client.post(
+        "/api/v1/auth/logout",
+        json={
+            "refresh_token": refresh_resp.json()["refresh_token"],
+        },
+    )
+    assert logout_resp.status_code == 204
+
+    # Query all audit events for this user
+    events = list(
+        db_session.scalars(
+            select(AuditEvent).where(
+                AuditEvent.actor_user_id == user_id
+            )
+        )
+    )
+    assert len(events) >= 4
+
+    prohibited_substrings = [
+        PASSWORD.lower(),
+        "password",
+        "hash",
+        "access_token",
+        "refresh_token",
+        "secret",
+        "bearer",
+    ]
+
+    for event in events:
+        meta_str = str(event.metadata_json).lower()
+        for forbidden in prohibited_substrings:
+            assert forbidden not in meta_str, (
+                f"Sensitive substring '{forbidden}' found in audit event {event.event_type} metadata: {event.metadata_json}"
+            )

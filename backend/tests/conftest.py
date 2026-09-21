@@ -2,8 +2,8 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session, sessionmaker
 
 import app.models
 from app.core.config import get_settings
@@ -21,6 +21,11 @@ if settings.test_database_url is None:
 test_engine = create_engine(
     settings.test_database_url,
     pool_pre_ping=True,
+)
+ConcurrencySessionLocal = sessionmaker(
+    bind=test_engine,
+    autoflush=False,
+    expire_on_commit=False,
 )
 
 
@@ -64,3 +69,44 @@ def client(db_session: Session) -> Iterator[TestClient]:
         yield test_client
 
     app.dependency_overrides.clear()
+@pytest.fixture
+def concurrency_session_factory():
+    with test_engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                TRUNCATE TABLE
+                    audit_events,
+                    idempotency_records,
+                    settlements,
+                    payment_shares,
+                    payments,
+                    session_participations,
+                    auth_sessions,
+                    sessions,
+                    users
+                CASCADE
+                """
+            )
+        )
+
+    yield ConcurrencySessionLocal
+
+    with test_engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                TRUNCATE TABLE
+                    audit_events,
+                    idempotency_records,
+                    settlements,
+                    payment_shares,
+                    payments,
+                    session_participations,
+                    auth_sessions,
+                    sessions,
+                    users
+                CASCADE
+                """
+            )
+        )
