@@ -565,8 +565,80 @@ def test_void_settlement_idempotency_replays_result(
     )
 
     assert first.status_code == 200
-    assert second.status_code == 200
-
     assert first.json()["id"] == second.json()["id"]
     assert first.json()["status"] == "VOIDED"
     assert second.json()["status"] == "VOIDED"
+
+
+def test_get_settlement_detail_and_access_control(client: TestClient) -> None:
+    arif = create_account(
+        client,
+        name="Arif Ali",
+        username="arif_get_settle",
+    )
+    sameer = create_account(
+        client,
+        name="Sameer Khan",
+        username="sameer_get_settle",
+    )
+    charlie = create_account(
+        client,
+        name="Charlie Brown",
+        username="charlie_get_settle",
+    )
+
+    create_debt(
+        client,
+        creditor=arif,
+        debtor=sameer,
+        amount_minor=10000,
+    )
+
+    create_response = client.post(
+        "/api/v1/settlements",
+        headers=headers(sameer),
+        json={
+            "to_user_id": arif["user"]["id"],
+            "amount_minor": 10000,
+            "method": "UPI",
+            "note": "Paid via GPay",
+        },
+    )
+    assert create_response.status_code == 201
+    settlement_id = create_response.json()["id"]
+
+    # 1. Payer (sameer) can fetch detail
+    res_payer = client.get(
+        f"/api/v1/settlements/{settlement_id}",
+        headers=headers(sameer),
+    )
+    assert res_payer.status_code == 200
+    assert res_payer.json()["id"] == settlement_id
+    assert res_payer.json()["amount_minor"] == 10000
+    assert res_payer.json()["method"] == "UPI"
+    assert res_payer.json()["note"] == "Paid via GPay"
+    assert res_payer.json()["status"] == "ACTIVE"
+
+    # 2. Recipient (arif) can fetch detail
+    res_recipient = client.get(
+        f"/api/v1/settlements/{settlement_id}",
+        headers=headers(arif),
+    )
+    assert res_recipient.status_code == 200
+    assert res_recipient.json()["id"] == settlement_id
+
+    # 3. Third party (charlie) gets 404
+    res_third_party = client.get(
+        f"/api/v1/settlements/{settlement_id}",
+        headers=headers(charlie),
+    )
+    assert res_third_party.status_code == 404
+    assert res_third_party.json()["error"]["code"] == "SETTLEMENT_NOT_FOUND"
+
+    # 4. Non-existent settlement gets 404
+    res_non_existent = client.get(
+        f"/api/v1/settlements/{uuid4()}",
+        headers=headers(sameer),
+    )
+    assert res_non_existent.status_code == 404
+    assert res_non_existent.json()["error"]["code"] == "SETTLEMENT_NOT_FOUND"

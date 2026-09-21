@@ -94,6 +94,31 @@ def create_settlement(
     return settlement
 
 
+def get_settlement_for_user(
+    db: Session,
+    *,
+    settlement_id: UUID,
+    user: User,
+) -> Settlement:
+    settlement = db.get(Settlement, settlement_id)
+
+    if settlement is None:
+        raise AppError(
+            code="SETTLEMENT_NOT_FOUND",
+            message="Settlement not found.",
+            status_code=404,
+        )
+
+    if user.id not in (settlement.from_user_id, settlement.to_user_id):
+        raise AppError(
+            code="SETTLEMENT_NOT_FOUND",
+            message="Settlement not found.",
+            status_code=404,
+        )
+
+    return settlement
+
+
 def void_settlement(
     db: Session,
     *,

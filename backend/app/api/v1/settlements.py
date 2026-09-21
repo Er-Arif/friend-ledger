@@ -20,6 +20,7 @@ from app.services.idempotency import (
 )
 from app.services.settlements import (
     create_settlement,
+    get_settlement_for_user,
     void_settlement,
 )
 
@@ -146,6 +147,27 @@ def record_settlement(
     db.commit()
 
     return response
+
+
+@router.get(
+    "/{settlement_id}",
+    response_model=SettlementRead,
+)
+def get_settlement(
+    settlement_id: UUID,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> SettlementRead:
+    settlement = get_settlement_for_user(
+        db,
+        settlement_id=settlement_id,
+        user=current_user,
+    )
+
+    return build_settlement_response(
+        db,
+        settlement,
+    )
 
 
 @router.post(
