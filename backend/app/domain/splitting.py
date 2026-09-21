@@ -21,6 +21,16 @@ def split_equal(
         ordered_participant_user_ids
     ):
         raise SplitError("Participants must be unique.")
+    
+    positive_non_payer_exists = any(
+        user_id != payer_user_id
+        for user_id in ordered_participant_user_ids
+    )
+
+    if not positive_non_payer_exists:
+        raise SplitError(
+            "At least one other person must participate in the payment."
+        )
 
     participant_count = len(ordered_participant_user_ids)
 

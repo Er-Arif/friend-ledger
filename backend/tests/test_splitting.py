@@ -184,3 +184,12 @@ def test_custom_split_rejects_personal_only_payment() -> None:
             },
             payer_user_id=arif,
         )
+def test_equal_split_rejects_personal_only_payment() -> None:
+    arif = uuid4()
+
+    with pytest.raises(SplitError):
+        split_equal(
+            total_amount_minor=50000,
+            ordered_participant_user_ids=[arif],
+            payer_user_id=arif,
+        )
