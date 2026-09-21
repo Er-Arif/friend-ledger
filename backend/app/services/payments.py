@@ -194,7 +194,7 @@ def create_payment(
             )
         )
 
-    db.commit()
+    db.flush()
     db.refresh(payment)
 
     return payment
@@ -329,7 +329,7 @@ def void_payment(
         else None
     )
 
-    db.commit()
+    db.flush()
     db.refresh(payment)
 
     return payment

@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi.testclient import TestClient
 
 PASSWORD = "TestPassword123!"
@@ -26,6 +28,7 @@ def create_account(
 def headers(account: dict) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {account['access_token']}",
+        "Idempotency-Key": str(uuid4()),
     }
 
 
@@ -535,3 +538,131 @@ def test_session_payment_history(
 
     assert len(items) == 1
     assert items[0]["description"] == "Dinner"
+
+def test_payment_idempotency_replays_same_result(
+    client: TestClient,
+) -> None:
+    arif = create_account(
+        client,
+        name="Arif",
+        username="arif",
+    )
+
+    sameer = create_account(
+        client,
+        name="Sameer",
+        username="sameer",
+    )
+
+    outing = create_outing(client, arif)
+
+    join_outing(
+        client,
+        sameer,
+        outing["join_code"],
+    )
+
+    request_headers = {
+        **headers(arif),
+        "Idempotency-Key": "payment-test-key-001",
+    }
+
+    payload = {
+        "description": "Dinner",
+        "total_amount_minor": 10000,
+        "split_type": "EQUAL",
+        "participant_user_ids": [
+            arif["user"]["id"],
+            sameer["user"]["id"],
+        ],
+    }
+
+    first = client.post(
+        f"/api/v1/sessions/{outing['id']}/payments",
+        headers=request_headers,
+        json=payload,
+    )
+
+    second = client.post(
+        f"/api/v1/sessions/{outing['id']}/payments",
+        headers=request_headers,
+        json=payload,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+    assert first.json()["id"] == second.json()["id"]
+
+    history = client.get(
+        f"/api/v1/sessions/{outing['id']}/payments",
+        headers=headers(arif),
+    )
+
+    assert history.status_code == 200
+    assert len(history.json()["items"]) == 1
+
+
+def test_payment_idempotency_key_cannot_be_reused_for_different_request(
+    client: TestClient,
+) -> None:
+    arif = create_account(
+        client,
+        name="Arif",
+        username="arif",
+    )
+
+    sameer = create_account(
+        client,
+        name="Sameer",
+        username="sameer",
+    )
+
+    outing = create_outing(client, arif)
+
+    join_outing(
+        client,
+        sameer,
+        outing["join_code"],
+    )
+
+    request_headers = {
+        **headers(arif),
+        "Idempotency-Key": "payment-test-key-002",
+    }
+
+    first = client.post(
+        f"/api/v1/sessions/{outing['id']}/payments",
+        headers=request_headers,
+        json={
+            "description": "Dinner",
+            "total_amount_minor": 10000,
+            "split_type": "EQUAL",
+            "participant_user_ids": [
+                arif["user"]["id"],
+                sameer["user"]["id"],
+            ],
+        },
+    )
+
+    assert first.status_code == 201
+
+    second = client.post(
+        f"/api/v1/sessions/{outing['id']}/payments",
+        headers=request_headers,
+        json={
+            "description": "Different Dinner",
+            "total_amount_minor": 20000,
+            "split_type": "EQUAL",
+            "participant_user_ids": [
+                arif["user"]["id"],
+                sameer["user"]["id"],
+            ],
+        },
+    )
+
+    assert second.status_code == 409
+    assert (
+        second.json()["error"]["code"]
+        == "IDEMPOTENCY_KEY_REUSED"
+    )

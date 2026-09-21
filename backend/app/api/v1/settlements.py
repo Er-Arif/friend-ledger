@@ -1,6 +1,7 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Header, status
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.settlement import Settlement
@@ -10,6 +11,11 @@ from app.schemas.settlement import (
     SettlementRead,
     SettlementUserRead,
     SettlementVoidRequest,
+)
+from app.services.idempotency import (
+    begin_idempotent_operation,
+    build_request_hash,
+    complete_idempotent_operation,
 )
 from app.services.settlements import (
     create_settlement,
@@ -70,7 +76,38 @@ def record_settlement(
     payload: SettlementCreateRequest,
     db: DbSession,
     current_user: CurrentUser,
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=1,
+            max_length=128,
+        ),
+    ],
 ) -> SettlementRead:
+    request_hash = build_request_hash(
+        {
+            "payload": payload.model_dump(
+                mode="json",
+            ),
+        }
+    )
+
+    record = begin_idempotent_operation(
+        db,
+        user_id=current_user.id,
+        operation="CREATE_SETTLEMENT",
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+
+    if record.state == "COMPLETED":
+        assert record.response_body is not None
+
+        return SettlementRead.model_validate(
+            record.response_body
+        )
+
     settlement = create_settlement(
         db,
         from_user=current_user,
@@ -80,10 +117,22 @@ def record_settlement(
         note=payload.note,
     )
 
-    return build_settlement_response(
+    response = build_settlement_response(
         db,
         settlement,
     )
+
+    complete_idempotent_operation(
+        record,
+        response_status=201,
+        response_body=response.model_dump(
+            mode="json",
+        ),
+    )
+
+    db.commit()
+
+    return response
 
 
 @router.post(
@@ -95,7 +144,39 @@ def void_existing_settlement(
     payload: SettlementVoidRequest,
     db: DbSession,
     current_user: CurrentUser,
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=1,
+            max_length=128,
+        ),
+    ],
 ) -> SettlementRead:
+    request_hash = build_request_hash(
+        {
+            "settlement_id": str(settlement_id),
+            "payload": payload.model_dump(
+                mode="json",
+            ),
+        }
+    )
+
+    record = begin_idempotent_operation(
+        db,
+        user_id=current_user.id,
+        operation="VOID_SETTLEMENT",
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+
+    if record.state == "COMPLETED":
+        assert record.response_body is not None
+
+        return SettlementRead.model_validate(
+            record.response_body
+        )
+
     settlement = void_settlement(
         db,
         settlement_id=settlement_id,
@@ -103,7 +184,19 @@ def void_existing_settlement(
         reason=payload.reason,
     )
 
-    return build_settlement_response(
+    response = build_settlement_response(
         db,
         settlement,
     )
+
+    complete_idempotent_operation(
+        record,
+        response_status=200,
+        response_body=response.model_dump(
+            mode="json",
+        ),
+    )
+
+    db.commit()
+
+    return response

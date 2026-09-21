@@ -88,7 +88,7 @@ def create_settlement(
     )
 
     db.add(settlement)
-    db.commit()
+    db.flush()
     db.refresh(settlement)
 
     return settlement
@@ -140,7 +140,7 @@ def void_settlement(
         else None
     )
 
-    db.commit()
+    db.flush()
     db.refresh(settlement)
 
     return settlement

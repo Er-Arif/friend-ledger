@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi.testclient import TestClient
 
 PASSWORD = "TestPassword123!"
@@ -25,6 +27,7 @@ def create_account(
 def headers(account: dict) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {account['access_token']}",
+        "Idempotency-Key": str(uuid4()),
     }
 
 

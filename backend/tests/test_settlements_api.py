@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi.testclient import TestClient
 
 PASSWORD = "TestPassword123!"
@@ -25,6 +27,7 @@ def create_account(
 def headers(account: dict) -> dict[str, str]:
     return {
         "Authorization": f"Bearer {account['access_token']}",
+        "Idempotency-Key": str(uuid4()),
     }
 
 
@@ -389,3 +392,181 @@ def test_settlement_appears_in_pairwise_ledger(
     assert entry["amount_minor"] == 15000
     assert entry["method"] == "UPI"
     assert entry["description"] == "Paid via UPI"
+
+def test_settlement_idempotency_replays_same_result(
+    client: TestClient,
+) -> None:
+    arif = create_account(
+        client,
+        name="Arif",
+        username="arif",
+    )
+    sameer = create_account(
+        client,
+        name="Sameer",
+        username="sameer",
+    )
+
+    create_debt(
+        client,
+        creditor=arif,
+        debtor=sameer,
+        amount_minor=50000,
+    )
+
+    request_headers = {
+        **headers(sameer),
+        "Idempotency-Key": "settlement-key-001",
+    }
+
+    payload = {
+        "to_user_id": arif["user"]["id"],
+        "amount_minor": 20000,
+        "method": "UPI",
+        "note": "Partial repayment",
+    }
+
+    first = client.post(
+        "/api/v1/settlements",
+        headers=request_headers,
+        json=payload,
+    )
+
+    second = client.post(
+        "/api/v1/settlements",
+        headers=request_headers,
+        json=payload,
+    )
+
+    assert first.status_code == 201
+    assert second.status_code == 201
+
+    assert first.json()["id"] == second.json()["id"]
+
+    balance = client.get(
+        f"/api/v1/me/balances/{arif['user']['id']}",
+        headers=headers(sameer),
+    )
+
+    assert balance.status_code == 200
+    assert balance.json()["amount_minor"] == 30000
+
+
+def test_settlement_idempotency_key_cannot_be_reused(
+    client: TestClient,
+) -> None:
+    arif = create_account(
+        client,
+        name="Arif",
+        username="arif",
+    )
+    sameer = create_account(
+        client,
+        name="Sameer",
+        username="sameer",
+    )
+
+    create_debt(
+        client,
+        creditor=arif,
+        debtor=sameer,
+        amount_minor=50000,
+    )
+
+    request_headers = {
+        **headers(sameer),
+        "Idempotency-Key": "settlement-key-002",
+    }
+
+    first = client.post(
+        "/api/v1/settlements",
+        headers=request_headers,
+        json={
+            "to_user_id": arif["user"]["id"],
+            "amount_minor": 10000,
+            "method": "UPI",
+        },
+    )
+
+    assert first.status_code == 201
+
+    second = client.post(
+        "/api/v1/settlements",
+        headers=request_headers,
+        json={
+            "to_user_id": arif["user"]["id"],
+            "amount_minor": 15000,
+            "method": "UPI",
+        },
+    )
+
+    assert second.status_code == 409
+
+    assert (
+        second.json()["error"]["code"]
+        == "IDEMPOTENCY_KEY_REUSED"
+    )
+
+
+def test_void_settlement_idempotency_replays_result(
+    client: TestClient,
+) -> None:
+    arif = create_account(
+        client,
+        name="Arif",
+        username="arif",
+    )
+    sameer = create_account(
+        client,
+        name="Sameer",
+        username="sameer",
+    )
+
+    create_debt(
+        client,
+        creditor=arif,
+        debtor=sameer,
+        amount_minor=50000,
+    )
+
+    create_response = client.post(
+        "/api/v1/settlements",
+        headers=headers(sameer),
+        json={
+            "to_user_id": arif["user"]["id"],
+            "amount_minor": 20000,
+            "method": "UPI",
+        },
+    )
+
+    assert create_response.status_code == 201
+
+    settlement_id = create_response.json()["id"]
+
+    request_headers = {
+        **headers(sameer),
+        "Idempotency-Key": "void-settlement-key-001",
+    }
+
+    payload = {
+        "reason": "Entered by mistake",
+    }
+
+    first = client.post(
+        f"/api/v1/settlements/{settlement_id}/void",
+        headers=request_headers,
+        json=payload,
+    )
+
+    second = client.post(
+        f"/api/v1/settlements/{settlement_id}/void",
+        headers=request_headers,
+        json=payload,
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+
+    assert first.json()["id"] == second.json()["id"]
+    assert first.json()["status"] == "VOIDED"
+    assert second.json()["status"] == "VOIDED"

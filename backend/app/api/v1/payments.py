@@ -1,6 +1,7 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Header, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
@@ -14,6 +15,11 @@ from app.schemas.payment import (
     PaymentShareRead,
     PaymentUserRead,
     PaymentVoidRequest,
+)
+from app.services.idempotency import (
+    begin_idempotent_operation,
+    build_request_hash,
+    complete_idempotent_operation,
 )
 from app.services.payments import (
     create_payment,
@@ -31,7 +37,10 @@ def build_payment_response(
     db: DbSession,
     payment: Payment,
 ) -> PaymentRead:
-    payer = db.get(User, payment.payer_user_id)
+    payer = db.get(
+        User,
+        payment.payer_user_id,
+    )
 
     assert payer is not None
 
@@ -62,7 +71,9 @@ def build_payment_response(
         total_amount_minor=payment.total_amount_minor,
         split_type=payment.split_type,
         status=payment.status,
-        corrected_from_payment_id=payment.corrected_from_payment_id,
+        corrected_from_payment_id=(
+            payment.corrected_from_payment_id
+        ),
         created_at=payment.created_at,
         voided_at=payment.voided_at,
         void_reason=payment.void_reason,
@@ -88,7 +99,39 @@ def add_payment(
     payload: PaymentCreateRequest,
     db: DbSession,
     current_user: CurrentUser,
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=1,
+            max_length=128,
+        ),
+    ],
 ) -> PaymentRead:
+    request_hash = build_request_hash(
+        {
+            "session_id": str(session_id),
+            "payload": payload.model_dump(
+                mode="json",
+            ),
+        }
+    )
+
+    record = begin_idempotent_operation(
+        db,
+        user_id=current_user.id,
+        operation="CREATE_PAYMENT",
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+
+    if record.state == "COMPLETED":
+        assert record.response_body is not None
+
+        return PaymentRead.model_validate(
+            record.response_body
+        )
+
     custom_shares = (
         {
             share.user_id: share.amount_minor
@@ -105,14 +148,28 @@ def add_payment(
         description=payload.description,
         total_amount_minor=payload.total_amount_minor,
         split_type=payload.split_type,
-        participant_user_ids=payload.participant_user_ids,
+        participant_user_ids=(
+            payload.participant_user_ids
+        ),
         custom_shares=custom_shares,
     )
 
-    return build_payment_response(
+    response = build_payment_response(
         db,
         payment,
     )
+
+    complete_idempotent_operation(
+        record,
+        response_status=201,
+        response_body=response.model_dump(
+            mode="json",
+        ),
+    )
+
+    db.commit()
+
+    return response
 
 
 @router.get(
@@ -132,7 +189,10 @@ def get_session_payments(
 
     return PaymentListResponse(
         items=[
-            build_payment_response(db, payment)
+            build_payment_response(
+                db,
+                payment,
+            )
             for payment in payments
         ]
     )
@@ -168,7 +228,39 @@ def void_existing_payment(
     payload: PaymentVoidRequest,
     db: DbSession,
     current_user: CurrentUser,
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=1,
+            max_length=128,
+        ),
+    ],
 ) -> PaymentRead:
+    request_hash = build_request_hash(
+        {
+            "payment_id": str(payment_id),
+            "payload": payload.model_dump(
+                mode="json",
+            ),
+        }
+    )
+
+    record = begin_idempotent_operation(
+        db,
+        user_id=current_user.id,
+        operation="VOID_PAYMENT",
+        idempotency_key=idempotency_key,
+        request_hash=request_hash,
+    )
+
+    if record.state == "COMPLETED":
+        assert record.response_body is not None
+
+        return PaymentRead.model_validate(
+            record.response_body
+        )
+
     payment = void_payment(
         db,
         payment_id=payment_id,
@@ -176,7 +268,19 @@ def void_existing_payment(
         reason=payload.reason,
     )
 
-    return build_payment_response(
+    response = build_payment_response(
         db,
         payment,
     )
+
+    complete_idempotent_operation(
+        record,
+        response_status=200,
+        response_body=response.model_dump(
+            mode="json",
+        ),
+    )
+
+    db.commit()
+
+    return response
