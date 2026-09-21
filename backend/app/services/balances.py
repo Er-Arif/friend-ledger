@@ -7,12 +7,15 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import AppError
 from app.models.payment import Payment
 from app.models.payment_share import PaymentShare
+from app.models.settlement import Settlement
 from app.models.user import User
 
 
 @dataclass(frozen=True)
 class PairwiseLedgerRow:
-    payment: Payment
+    source_type: str
+    payment: Payment | None
+    settlement: Settlement | None
     direction: str
     amount_minor: int
 
@@ -23,7 +26,7 @@ def calculate_pairwise_net(
     user_id: UUID,
     other_user_id: UUID,
 ) -> int:
-    rows = db.execute(
+    payment_rows = db.execute(
         select(Payment, PaymentShare)
         .join(
             PaymentShare,
@@ -52,7 +55,7 @@ def calculate_pairwise_net(
 
     net = 0
 
-    for payment, share in rows:
+    for payment, share in payment_rows:
         if share.user_id == payment.payer_user_id:
             continue
 
@@ -60,6 +63,34 @@ def calculate_pairwise_net(
             net += share.amount_minor
         else:
             net -= share.amount_minor
+
+    settlements = db.scalars(
+        select(Settlement).where(
+            Settlement.status == "ACTIVE",
+            (
+                (
+                    Settlement.from_user_id == user_id
+                )
+                & (
+                    Settlement.to_user_id == other_user_id
+                )
+            )
+            | (
+                (
+                    Settlement.from_user_id == other_user_id
+                )
+                & (
+                    Settlement.to_user_id == user_id
+                )
+            ),
+        )
+    )
+
+    for settlement in settlements:
+        if settlement.from_user_id == user_id:
+            net += settlement.amount_minor
+        else:
+            net -= settlement.amount_minor
 
     return net
 
@@ -69,7 +100,7 @@ def get_balance_counterparts(
     *,
     user_id: UUID,
 ) -> list[User]:
-    user_ids = set(
+    share_user_ids = set(
         db.scalars(
             select(PaymentShare.user_id)
             .join(
@@ -99,7 +130,30 @@ def get_balance_counterparts(
         ).all()
     )
 
-    counterpart_ids = user_ids | payer_ids
+    settlement_to_ids = set(
+        db.scalars(
+            select(Settlement.to_user_id).where(
+                Settlement.status == "ACTIVE",
+                Settlement.from_user_id == user_id,
+            )
+        ).all()
+    )
+
+    settlement_from_ids = set(
+        db.scalars(
+            select(Settlement.from_user_id).where(
+                Settlement.status == "ACTIVE",
+                Settlement.to_user_id == user_id,
+            )
+        ).all()
+    )
+
+    counterpart_ids = (
+        share_user_ids
+        | payer_ids
+        | settlement_to_ids
+        | settlement_from_ids
+    )
 
     if not counterpart_ids:
         return []
@@ -119,7 +173,7 @@ def get_pairwise_ledger(
     user_id: UUID,
     other_user_id: UUID,
 ) -> list[PairwiseLedgerRow]:
-    rows = db.execute(
+    payment_rows = db.execute(
         select(Payment, PaymentShare)
         .join(
             PaymentShare,
@@ -144,33 +198,78 @@ def get_pairwise_ledger(
                 )
             ),
         )
-        .order_by(
-            Payment.created_at.desc(),
-            Payment.id.desc(),
-        )
     ).all()
 
-    ledger: list[PairwiseLedgerRow] = []
+    rows: list[PairwiseLedgerRow] = []
 
-    for payment, share in rows:
+    for payment, share in payment_rows:
         if share.user_id == payment.payer_user_id:
             continue
 
-        direction = (
-            "OWED_TO_ME"
-            if payment.payer_user_id == user_id
-            else "I_OWE"
-        )
-
-        ledger.append(
+        rows.append(
             PairwiseLedgerRow(
+                source_type="PAYMENT",
                 payment=payment,
-                direction=direction,
+                settlement=None,
+                direction=(
+                    "OWED_TO_ME"
+                    if payment.payer_user_id == user_id
+                    else "I_OWE"
+                ),
                 amount_minor=share.amount_minor,
             )
         )
 
-    return ledger
+    settlements = db.scalars(
+        select(Settlement).where(
+            Settlement.status == "ACTIVE",
+            (
+                (
+                    Settlement.from_user_id == user_id
+                )
+                & (
+                    Settlement.to_user_id == other_user_id
+                )
+            )
+            | (
+                (
+                    Settlement.from_user_id == other_user_id
+                )
+                & (
+                    Settlement.to_user_id == user_id
+                )
+            ),
+        )
+    )
+
+    for settlement in settlements:
+        rows.append(
+            PairwiseLedgerRow(
+                source_type="SETTLEMENT",
+                payment=None,
+                settlement=settlement,
+                direction=(
+                    "SETTLED_BY_ME"
+                    if settlement.from_user_id == user_id
+                    else "SETTLED_TO_ME"
+                ),
+                amount_minor=settlement.amount_minor,
+            )
+        )
+
+    def created_at(row: PairwiseLedgerRow):
+        if row.payment is not None:
+            return row.payment.created_at
+
+        assert row.settlement is not None
+        return row.settlement.created_at
+
+    rows.sort(
+        key=created_at,
+        reverse=True,
+    )
+
+    return rows
 
 
 def get_counterpart(

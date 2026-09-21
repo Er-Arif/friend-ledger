@@ -175,14 +175,46 @@ def get_ledger_with_person(
             direction=balance_direction,
             amount_minor=balance_amount_minor,
         ),
-        entries=[
+                entries=[
             LedgerEntry(
-                payment_id=row.payment.id,
-                session_id=row.payment.session_id,
-                description=row.payment.description,
-                created_at=row.payment.created_at,
+                source_type=row.source_type,
+                payment_id=(
+                    row.payment.id
+                    if row.payment is not None
+                    else None
+                ),
+                settlement_id=(
+                    row.settlement.id
+                    if row.settlement is not None
+                    else None
+                ),
+                session_id=(
+                    row.payment.session_id
+                    if row.payment is not None
+                    else None
+                ),
+                description=(
+                    row.payment.description
+                    if row.payment is not None
+                    else (
+                        row.settlement.note
+                        if row.settlement is not None
+                        and row.settlement.note
+                        else "Settlement"
+                    )
+                ),
+                created_at=(
+                    row.payment.created_at
+                    if row.payment is not None
+                    else row.settlement.created_at
+                ),
                 direction=row.direction,
                 amount_minor=row.amount_minor,
+                method=(
+                    row.settlement.method
+                    if row.settlement is not None
+                    else None
+                ),
             )
             for row in rows
         ],

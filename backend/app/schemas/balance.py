@@ -30,13 +30,24 @@ class PairwiseBalanceResponse(BaseModel):
 
 
 class LedgerEntry(BaseModel):
-    payment_id: UUID
-    session_id: UUID
+    source_type: Literal["PAYMENT", "SETTLEMENT"]
+
+    payment_id: UUID | None = None
+    settlement_id: UUID | None = None
+    session_id: UUID | None = None
+
     description: str
     created_at: datetime
 
-    direction: Literal["I_OWE", "OWED_TO_ME"]
+    direction: Literal[
+        "I_OWE",
+        "OWED_TO_ME",
+        "SETTLED_BY_ME",
+        "SETTLED_TO_ME",
+    ]
+
     amount_minor: int
+    method: Literal["CASH", "UPI", "OTHER"] | None = None
 
 
 class PairwiseLedgerResponse(BaseModel):
