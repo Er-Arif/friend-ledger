@@ -1,4 +1,5 @@
 from app.models.auth_session import AuthSession
+from app.models.idempotency_record import IdempotencyRecord
 from app.models.payment import Payment
 from app.models.payment_share import PaymentShare
 from app.models.session import OutingSession
@@ -8,6 +9,7 @@ from app.models.user import User
 
 __all__ = [
     "AuthSession",
+    "IdempotencyRecord",
     "OutingSession",
     "Payment",
     "PaymentShare",

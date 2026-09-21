@@ -8,6 +8,7 @@ def test_core_tables_registered() -> None:
     assert {
         "users",
         "auth_sessions",
+        "idempotency_records",
         "sessions",
         "session_participations",
         "payments",
