@@ -12,6 +12,7 @@ from app.schemas.settlement import (
     SettlementUserRead,
     SettlementVoidRequest,
 )
+from app.services.audit import record_audit_event
 from app.services.idempotency import (
     begin_idempotent_operation,
     build_request_hash,
@@ -121,6 +122,18 @@ def record_settlement(
         db,
         settlement,
     )
+    record_audit_event(
+    db,
+    actor_user_id=current_user.id,
+    event_type="SETTLEMENT_CREATED",
+    entity_type="SETTLEMENT",
+    entity_id=settlement.id,
+    metadata={
+        "to_user_id": str(settlement.to_user_id),
+        "amount_minor": settlement.amount_minor,
+        "method": settlement.method,
+    },
+)
 
     complete_idempotent_operation(
         record,
@@ -188,6 +201,16 @@ def void_existing_settlement(
         db,
         settlement,
     )
+    record_audit_event(
+    db,
+    actor_user_id=current_user.id,
+    event_type="SETTLEMENT_VOIDED",
+    entity_type="SETTLEMENT",
+    entity_id=settlement.id,
+    metadata={
+        "reason": settlement.void_reason,
+    },
+)
 
     complete_idempotent_operation(
         record,

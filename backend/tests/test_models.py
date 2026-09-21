@@ -13,6 +13,7 @@ def test_core_tables_registered() -> None:
         "session_participations",
         "payments",
         "payment_shares",
+        "audit_events",
     }.issubset(Base.metadata.tables)
 
 

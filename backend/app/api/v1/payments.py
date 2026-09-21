@@ -16,6 +16,7 @@ from app.schemas.payment import (
     PaymentUserRead,
     PaymentVoidRequest,
 )
+from app.services.audit import record_audit_event
 from app.services.idempotency import (
     begin_idempotent_operation,
     build_request_hash,
@@ -158,6 +159,18 @@ def add_payment(
         db,
         payment,
     )
+    record_audit_event(
+    db,
+    actor_user_id=current_user.id,
+    event_type="PAYMENT_CREATED",
+    entity_type="PAYMENT",
+    entity_id=payment.id,
+    session_id=payment.session_id,
+    metadata={
+        "total_amount_minor": payment.total_amount_minor,
+        "split_type": payment.split_type,
+    },
+)
 
     complete_idempotent_operation(
         record,
@@ -272,6 +285,17 @@ def void_existing_payment(
         db,
         payment,
     )
+    record_audit_event(
+    db,
+    actor_user_id=current_user.id,
+    event_type="PAYMENT_VOIDED",
+    entity_type="PAYMENT",
+    entity_id=payment.id,
+    session_id=payment.session_id,
+    metadata={
+        "reason": payment.void_reason,
+    },
+)
 
     complete_idempotent_operation(
         record,
