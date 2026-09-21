@@ -62,8 +62,7 @@ def create_outing(
     )
 
     db.add(participation)
-
-    db.commit()
+    db.flush()
 
     db.refresh(outing)
     db.refresh(participation)
@@ -120,7 +119,7 @@ def join_outing(
     )
 
     db.add(participation)
-    db.commit()
+    db.flush()
 
     db.refresh(participation)
 
@@ -304,7 +303,7 @@ def leave_outing(
         outing.status = "CLOSED"
         outing.closed_at = now
 
-    db.commit()
+    db.flush()
 
     db.refresh(participation)
     db.refresh(outing)
@@ -376,7 +375,7 @@ def finish_outing(
     outing.status = "CLOSED"
     outing.closed_at = now
 
-    db.commit()
+    db.flush()
     db.refresh(outing)
 
     return outing

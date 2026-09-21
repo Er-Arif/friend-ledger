@@ -9,6 +9,7 @@ from app.schemas.auth import (
     RegisterRequest,
     TokenPairResponse,
 )
+from app.services.audit import record_audit_event
 from app.services.auth import (
     login_user,
     logout_user,
@@ -38,6 +39,19 @@ def register(
         password=payload.password,
     )
 
+    record_audit_event(
+        db,
+        actor_user_id=user.id,
+        event_type="USER_REGISTERED",
+        entity_type="USER",
+        entity_id=user.id,
+        metadata={
+            "username": user.username,
+        },
+    )
+
+    db.commit()
+
     return AuthResponse(
         user=user,
         access_token=access_token,
@@ -59,6 +73,17 @@ def login(
         password=payload.password,
     )
 
+    record_audit_event(
+        db,
+        actor_user_id=user.id,
+        event_type="LOGIN_SUCCEEDED",
+        entity_type="USER",
+        entity_id=user.id,
+        metadata={},
+    )
+
+    db.commit()
+
     return AuthResponse(
         user=user,
         access_token=access_token,
@@ -74,10 +99,23 @@ def refresh(
     payload: RefreshRequest,
     db: DbSession,
 ) -> TokenPairResponse:
-    access_token, refresh_token = refresh_tokens(
-        db,
-        refresh_token=payload.refresh_token,
+    user, access_token, refresh_token = (
+        refresh_tokens(
+            db,
+            refresh_token=payload.refresh_token,
+        )
     )
+
+    record_audit_event(
+        db,
+        actor_user_id=user.id,
+        event_type="TOKEN_REFRESHED",
+        entity_type="USER",
+        entity_id=user.id,
+        metadata={},
+    )
+
+    db.commit()
 
     return TokenPairResponse(
         access_token=access_token,
@@ -93,9 +131,25 @@ def logout(
     payload: LogoutRequest,
     db: DbSession,
 ) -> Response:
-    logout_user(
+    user = logout_user(
         db,
         refresh_token=payload.refresh_token,
     )
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    if user is not None:
+        record_audit_event(
+            db,
+            actor_user_id=user.id,
+            event_type="LOGOUT",
+            entity_type="USER",
+            entity_id=user.id,
+            metadata={},
+        )
+
+        db.commit()
+    else:
+        db.rollback()
+
+    return Response(
+        status_code=status.HTTP_204_NO_CONTENT
+    )

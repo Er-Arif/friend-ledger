@@ -18,6 +18,7 @@ from app.schemas.session import (
     SessionListItem,
     SessionListResponse,
 )
+from app.services.audit import record_audit_event
 from app.services.sessions import (
     count_active_participants,
     create_outing,
@@ -51,6 +52,19 @@ def create_session(
         user=current_user,
         name=payload.name,
     )
+    record_audit_event(
+    db,
+    actor_user_id=current_user.id,
+    event_type="SESSION_CREATED",
+    entity_type="SESSION",
+    entity_id=outing.id,
+    session_id=outing.id,
+    metadata={
+        "name": outing.name,
+    },
+)
+
+    db.commit()
 
     return SessionCreateResponse(
         id=outing.id,
@@ -78,6 +92,19 @@ def join_session(
         user=current_user,
         join_code=payload.join_code,
     )
+    record_audit_event(
+    db,
+    actor_user_id=current_user.id,
+    event_type="SESSION_JOINED",
+    entity_type="SESSION",
+    entity_id=outing.id,
+    session_id=outing.id,
+    metadata={
+        "participation_id": str(participation.id),
+    },
+)
+
+    db.commit()
 
     return SessionJoinResponse(
         session=SessionBasicRead(
@@ -90,6 +117,7 @@ def join_session(
             joined_at=participation.joined_at,
         ),
     )
+    
 
 
 @router.get(
@@ -196,6 +224,21 @@ def leave_session(
         session_id=session_id,
         user=current_user,
     )
+    record_audit_event(
+    db,
+    actor_user_id=current_user.id,
+    event_type="SESSION_LEFT",
+    entity_type="SESSION",
+    entity_id=outing.id,
+    session_id=outing.id,
+    metadata={
+        "participation_id": str(participation.id),
+        "session_status": outing.status,
+        "auto_closed": outing.status == "CLOSED",
+    },
+)
+
+    db.commit()
 
     assert participation.left_at is not None
 
@@ -220,6 +263,23 @@ def finish_session(
         session_id=session_id,
         user=current_user,
     )
+    record_audit_event(
+    db,
+    actor_user_id=current_user.id,
+    event_type="SESSION_FINISHED",
+    entity_type="SESSION",
+    entity_id=outing.id,
+    session_id=outing.id,
+    metadata={
+        "closed_at": (
+            outing.closed_at.isoformat()
+            if outing.closed_at is not None
+            else None
+        ),
+    },
+)
+
+    db.commit()
 
     assert outing.closed_at is not None
 

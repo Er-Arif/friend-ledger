@@ -86,10 +86,16 @@ def register_user(
             status_code=409,
         ) from exc
 
-    refresh_token = create_refresh_session(db, user)
-    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_session(
+        db,
+        user,
+    )
 
-    db.commit()
+    access_token = create_access_token(
+        user.id,
+    )
+
+    db.flush()
     db.refresh(user)
 
     return user, access_token, refresh_token
@@ -126,10 +132,16 @@ def login_user(
             status_code=403,
         )
 
-    refresh_token = create_refresh_session(db, user)
-    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_session(
+        db,
+        user,
+    )
 
-    db.commit()
+    access_token = create_access_token(
+        user.id,
+    )
+
+    db.flush()
 
     return user, access_token, refresh_token
 
@@ -138,17 +150,26 @@ def refresh_tokens(
     db: Session,
     *,
     refresh_token: str,
-) -> tuple[str, str]:
-    token_hash = hash_refresh_token(refresh_token)
+) -> tuple[User, str, str]:
+    token_hash = hash_refresh_token(
+        refresh_token
+    )
+
     now = datetime.now(UTC)
 
     auth_session = db.scalar(
         select(AuthSession)
-        .where(AuthSession.refresh_token_hash == token_hash)
+        .where(
+            AuthSession.refresh_token_hash
+            == token_hash
+        )
         .with_for_update()
     )
 
-    if auth_session is None or auth_session.revoked_at is not None:
+    if (
+        auth_session is None
+        or auth_session.revoked_at is not None
+    ):
         raise AppError(
             code="TOKEN_INVALID",
             message="Refresh token is invalid.",
@@ -162,7 +183,10 @@ def refresh_tokens(
             status_code=401,
         )
 
-    user = db.get(User, auth_session.user_id)
+    user = db.get(
+        User,
+        auth_session.user_id,
+    )
 
     if user is None:
         raise AppError(
@@ -180,37 +204,58 @@ def refresh_tokens(
 
     new_refresh_token = generate_refresh_token()
 
-    auth_session.refresh_token_hash = hash_refresh_token(
-        new_refresh_token
+    auth_session.refresh_token_hash = (
+        hash_refresh_token(
+            new_refresh_token
+        )
     )
+
     auth_session.last_used_at = now
-    auth_session.expires_at = now + timedelta(
-        days=settings.refresh_token_expire_days
+    auth_session.expires_at = (
+        now
+        + timedelta(
+            days=settings.refresh_token_expire_days
+        )
     )
 
-    access_token = create_access_token(user.id)
+    access_token = create_access_token(
+        user.id,
+    )
 
-    db.commit()
+    db.flush()
 
-    return access_token, new_refresh_token
+    return user, access_token, new_refresh_token
 
 
 def logout_user(
     db: Session,
     *,
     refresh_token: str,
-) -> None:
-    token_hash = hash_refresh_token(refresh_token)
+) -> User | None:
+    token_hash = hash_refresh_token(
+        refresh_token
+    )
 
     auth_session = db.scalar(
-        select(AuthSession).where(
-            AuthSession.refresh_token_hash == token_hash
+        select(AuthSession)
+        .where(
+            AuthSession.refresh_token_hash
+            == token_hash
         )
+        .with_for_update()
     )
 
     if auth_session is None:
-        return
+        return None
+
+    user = db.get(
+        User,
+        auth_session.user_id,
+    )
 
     if auth_session.revoked_at is None:
         auth_session.revoked_at = datetime.now(UTC)
-        db.commit()
+
+    db.flush()
+
+    return user
