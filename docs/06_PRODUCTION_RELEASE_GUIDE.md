@@ -206,7 +206,7 @@ The mobile app communicates with the backend via HTTPS and WSS derived from `EXP
 
 ### Prerequisites
 1. Apple Developer Account (Individual or Organization enrollment).
-2. App registered in App Store Connect with bundle identifier matching `app.json` (`com.friendledger.app`).
+2. App registered in App Store Connect with bundle identifier matching `app.json` (`com.erarif.friendledger`).
 3. EAS CLI installed (`npm install -g eas-cli`) and logged in (`eas login`).
 
 ### Step-by-Step Build & Submit

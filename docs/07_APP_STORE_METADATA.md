@@ -2,7 +2,7 @@
 
 **Release**: v1.0.0 Release Candidate  
 **Platform**: iOS (App Store Connect & TestFlight)  
-**Package / Bundle ID**: `com.friendledger.app` *(Confirm with your Apple Developer Account)*  
+**Package / Bundle ID**: `com.erarif.friendledger`  
 
 ---
 

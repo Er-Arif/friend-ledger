@@ -9,14 +9,14 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.friendledger.app",
+      "bundleIdentifier": "com.erarif.friendledger",
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Friend Ledger needs camera access to scan QR codes for joining outings."
       }
     },
     "android": {
-      "package": "com.friendledger.app",
+      "package": "com.erarif.friendledger",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#16A36A",
