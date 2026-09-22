@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (FastAPI & PostgreSQL)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres_ci_password
+          POSTGRES_DB: friend_ledger_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+psycopg://postgres:postgres_ci_password@localhost:5432/friend_ledger_ci
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres_ci_password@localhost:5432/friend_ledger_test_ci
+      JWT_SECRET: ci_test_secret_key_at_least_32_characters_long_for_validation
+      CORS_ORIGINS: http://localhost:8081,http://127.0.0.1:8081
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Set up Python 3.13
+        run: uv python install 3.13
+
+      - name: Install backend dependencies
+        run: uv sync --dev
+
+      - name: Create CI test database
+        run: |
+          uv run python -c "
+          import psycopg
+          with psycopg.connect('postgresql://postgres:postgres_ci_password@localhost:5432/friend_ledger_ci', autocommit=True) as conn:
+              conn.execute('CREATE DATABASE friend_ledger_test_ci;')
+          "
+
+      - name: Run Ruff Linter Check
+        run: uv run ruff check .
+
+      - name: Run Database Migrations
+        run: uv run alembic upgrade head
+
+      - name: Run Alembic Schema Drift Check
+        run: uv run alembic check
+
+      - name: Run Pytest Test Suite
+        run: uv run pytest -vv
+
+  mobile:
+    name: Mobile (React Native & Expo)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: mobile
+
+    env:
+      EXPO_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: Run Mobile Unit Tests
+        run: npm test
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript Typecheck
+        run: npx tsc --noEmit
+
+      - name: Run Expo Doctor Diagnostics
+        run: npx expo-doctor
