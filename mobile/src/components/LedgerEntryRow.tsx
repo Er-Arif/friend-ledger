@@ -16,11 +16,27 @@ interface LedgerEntryRowProps {
 
 export const LedgerEntryRow: React.FC<LedgerEntryRowProps> = ({ entry, onPress }) => {
   const isSettlement = entry.source_type === 'SETTLEMENT';
-  const isOwedToMe = entry.direction === 'OWED_TO_ME';
+  let amountPrefix = '';
+  let amountColor: string = colors.textPrimary;
+  let directionLabel = '';
 
-  // Amount sign from current user's perspective
-  const amountPrefix = isOwedToMe ? '+' : '-';
-  const amountColor = isOwedToMe ? colors.owedToMe : colors.iOwe;
+  if (entry.direction === 'OWED_TO_ME') {
+    amountPrefix = '+';
+    amountColor = colors.owedToMe;
+    directionLabel = 'Owed to you';
+  } else if (entry.direction === 'I_OWE') {
+    amountPrefix = '-';
+    amountColor = colors.iOwe;
+    directionLabel = 'You owe';
+  } else if (entry.direction === 'SETTLED_BY_ME') {
+    amountPrefix = '';
+    amountColor = colors.primary;
+    directionLabel = 'You settled';
+  } else if (entry.direction === 'SETTLED_TO_ME') {
+    amountPrefix = '';
+    amountColor = colors.primary;
+    directionLabel = 'Settled to you';
+  }
 
   const iconName = isSettlement
     ? ('checkmark-circle-outline' as const)
@@ -50,7 +66,7 @@ export const LedgerEntryRow: React.FC<LedgerEntryRowProps> = ({ entry, onPress }
           {formatMoney(entry.amount_minor)}
         </Text>
         <Text style={styles.directionLabel}>
-          {isOwedToMe ? 'Owed to you' : 'You owe'}
+          {directionLabel}
         </Text>
       </View>
     </View>

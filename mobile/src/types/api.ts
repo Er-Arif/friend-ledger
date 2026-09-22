@@ -200,7 +200,7 @@ export interface LedgerEntry {
   session_id: string | null;
   description: string;
   created_at: string;
-  direction: 'I_OWE' | 'OWED_TO_ME';
+  direction: 'I_OWE' | 'OWED_TO_ME' | 'SETTLED_BY_ME' | 'SETTLED_TO_ME';
   amount_minor: number;
   method: string | null;
 }

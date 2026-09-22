@@ -28,9 +28,14 @@ import {
 describe('Money Utilities', () => {
   it('formats minor units to rupees with Indian grouping and INR symbol', () => {
     assert.equal(formatMoney(0), '₹0');
+    assert.equal(formatMoney(1), '₹0.01');
+    assert.equal(formatMoney(10), '₹0.10');
     assert.equal(formatMoney(100), '₹1');
+    assert.equal(formatMoney(105), '₹1.05');
     assert.equal(formatMoney(150), '₹1.50');
     assert.equal(formatMoney(10000), '₹100');
+    assert.equal(formatMoney(99999), '₹999.99');
+    assert.equal(formatMoney(100000), '₹1,000');
     assert.equal(formatMoney(240000), '₹2,400');
     assert.equal(formatMoney(10000000), '₹1,00,000');
   });
@@ -38,24 +43,36 @@ describe('Money Utilities', () => {
   it('formats decimals conditionally based on options', () => {
     assert.equal(formatMoney(10000, { showDecimalIfZero: true }), '₹100.00');
     assert.equal(formatMoney(10050, { showDecimalIfZero: false }), '₹100.50');
+    assert.equal(formatMoney(0, { showDecimalIfZero: true }), '₹0.00');
   });
 
   it('parses rupee string inputs to integer minor paise units', () => {
     assert.equal(parseRupeesToPaise('0'), 0);
+    assert.equal(parseRupeesToPaise('0.01'), 1);
+    assert.equal(parseRupeesToPaise('0.1'), 10);
+    assert.equal(parseRupeesToPaise('0.10'), 10);
     assert.equal(parseRupeesToPaise('1'), 100);
+    assert.equal(parseRupeesToPaise('1.05'), 105);
     assert.equal(parseRupeesToPaise('1.5'), 150);
     assert.equal(parseRupeesToPaise('1.50'), 150);
     assert.equal(parseRupeesToPaise('0.05'), 5);
+    assert.equal(parseRupeesToPaise('999.99'), 99999);
+    assert.equal(parseRupeesToPaise('1,000'), 100000);
     assert.equal(parseRupeesToPaise('2400'), 240000);
     assert.equal(parseRupeesToPaise('  2400.00  '), 240000);
+    assert.equal(parseRupeesToPaise('1,00,000'), 10000000);
     assert.equal(parseRupeesToPaise('-50'), 0);
     assert.equal(parseRupeesToPaise('abc'), 0);
   });
 
   it('converts minor paise units to clean input strings', () => {
     assert.equal(paiseToInputString(0), '');
+    assert.equal(paiseToInputString(1), '0.01');
+    assert.equal(paiseToInputString(10), '0.10');
     assert.equal(paiseToInputString(100), '1');
+    assert.equal(paiseToInputString(105), '1.05');
     assert.equal(paiseToInputString(150), '1.50');
+    assert.equal(paiseToInputString(99999), '999.99');
     assert.equal(paiseToInputString(240000), '2400');
   });
 });
