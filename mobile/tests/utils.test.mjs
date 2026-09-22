@@ -178,6 +178,24 @@ describe('Error Handling & Mapping', () => {
     const networkErr = new Error('Network request failed');
     assert.match(getFriendlyErrorMessage(networkErr), /connect to Friend Ledger/);
 
+    const failedToFetch = new TypeError('Failed to fetch');
+    assert.equal(
+      getFriendlyErrorMessage(failedToFetch),
+      "Couldn't connect to Friend Ledger. Check your network or development server."
+    );
+
+    const loadFailed = new TypeError('Load failed');
+    assert.equal(
+      getFriendlyErrorMessage(loadFailed),
+      "Couldn't connect to Friend Ledger. Check your network or development server."
+    );
+
+    const networkErrorFirefox = new Error('NetworkError when attempting to fetch resource.');
+    assert.equal(
+      getFriendlyErrorMessage(networkErrorFirefox),
+      "Couldn't connect to Friend Ledger. Check your network or development server."
+    );
+
     const unknownErr = new Error('Random string');
     assert.equal(getFriendlyErrorMessage(unknownErr), 'Something went wrong. Please try again.');
   });

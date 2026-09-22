@@ -37,7 +37,7 @@ export const Toast: React.FC = () => {
   }[type];
 
   return (
-    <View style={styles.wrapper} pointerEvents="box-none">
+    <View style={styles.wrapper}>
       <TouchableOpacity
         style={[styles.container, { backgroundColor: bgColor, borderColor }]}
         onPress={hide}
@@ -62,6 +62,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 9999,
     paddingHorizontal: spacing.lg,
+    pointerEvents: 'box-none',
   },
   container: {
     flexDirection: 'row',

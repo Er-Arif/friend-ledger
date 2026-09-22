@@ -71,8 +71,17 @@ export function getFriendlyErrorMessage(error: unknown): string {
   }
 
   if (error instanceof Error) {
-    if (error.name === 'AbortError' || error.message.includes('network') || error.message.includes('Network')) {
-      return "Couldn't connect to Friend Ledger. Check your internet connection.";
+    const msg = error.message.toLowerCase();
+    if (
+      error.name === 'AbortError' ||
+      msg.includes('network') ||
+      msg.includes('failed to fetch') ||
+      msg.includes('fetch failed') ||
+      msg.includes('load failed') ||
+      msg.includes('networkerror') ||
+      msg.includes('connection refused')
+    ) {
+      return "Couldn't connect to Friend Ledger. Check your network or development server.";
     }
   }
 

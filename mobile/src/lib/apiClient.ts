@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { parseApiError } from './errors';
 import { clearTokens, getTokens, setTokens } from './storage';
 import { TokenPairResponse } from '../types/api';
@@ -6,8 +7,20 @@ import { TokenPairResponse } from '../types/api';
  * Centralized API Client for Friend Ledger
  */
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || 'http://127.0.0.1:8000';
+export function getApiBaseUrl(): string {
+  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.replace(/\/$/, '');
+
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    const hostname = window.location.hostname;
+    if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+        return `http://${hostname}:8000`;
+      }
+    }
+  }
+
+  return envUrl || 'http://127.0.0.1:8000';
+}
 
 const REQUEST_TIMEOUT_MS = 15000;
 
@@ -42,7 +55,8 @@ async function refreshAccessToken(): Promise<string | null> {
         return null;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -94,7 +108,8 @@ async function request<T>(
   options?: RequestOptions,
   isRetry = false
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -177,5 +192,5 @@ export const api = {
   },
 
   generateIdempotencyKey,
-  getBaseUrl: () => API_BASE_URL,
+  getBaseUrl: getApiBaseUrl,
 };

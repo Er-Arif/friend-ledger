@@ -165,3 +165,18 @@ def test_cors_headers_handling(client: TestClient) -> None:
     )
     assert response.status_code == 200
     assert "access-control-allow-origin" in response.headers
+
+
+def test_cors_preflight_for_lan_origin(client: TestClient) -> None:
+    response = client.options(
+        "/api/v1/auth/login",
+        headers={
+            "Origin": "http://192.168.1.48:8081",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "Content-Type, Authorization, Idempotency-Key",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == "http://192.168.1.48:8081"
+    assert response.headers.get("access-control-allow-credentials") == "true"
+

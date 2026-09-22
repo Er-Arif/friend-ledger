@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { Screen } from '../../components/ui/Screen';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { StatusChip } from '../../components/ui/StatusChip';
@@ -145,6 +146,10 @@ export default function OutingDetailScreen() {
   const isActive = session.status === 'ACTIVE';
   const isUserActive = session.current_user?.is_active ?? false;
   const activeCount = session.active_participants?.length ?? 0;
+  const otherActiveParticipants = (session.active_participants ?? []).filter(
+    (p) => p.user_id !== user?.id
+  );
+  const canAddPayment = isActive && isUserActive && otherActiveParticipants.length > 0;
   const title = session.name || 'Outing';
 
   // Calculate total spent in this outing (excluding voided payments)
@@ -242,7 +247,7 @@ export default function OutingDetailScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Payments</Text>
-          {isActive && isUserActive && (
+          {canAddPayment && (
             <TouchableOpacity
               style={styles.addPaymentHeaderBtn}
               onPress={() => router.push(`/payments/add?sessionId=${session.id}`)}
@@ -255,17 +260,58 @@ export default function OutingDetailScreen() {
         </View>
 
         {payments.length === 0 ? (
-          <EmptyState
-            icon="receipt-outline"
-            title="No payments yet"
-            description="When anyone pays for food, tickets, or drinks, record it here to split."
-            actionLabel={isActive && isUserActive ? 'Add First Payment' : undefined}
-            onAction={
-              isActive && isUserActive
-                ? () => router.push(`/payments/add?sessionId=${session.id}`)
-                : undefined
-            }
-          />
+          canAddPayment ? (
+            <EmptyState
+              icon="receipt-outline"
+              title="No payments yet"
+              description="When anyone pays for food, tickets, or drinks, record it here to split."
+              actionLabel="Add First Payment"
+              onAction={() => router.push(`/payments/add?sessionId=${session.id}`)}
+            />
+          ) : isActive && isUserActive && otherActiveParticipants.length === 0 ? (
+            <View style={styles.waitingCard}>
+              <View style={styles.waitingIconWrap}>
+                <Ionicons name="people-outline" size={32} color={colors.primary} />
+              </View>
+              <Text style={styles.waitingTitle}>Waiting for friends</Text>
+              <Text style={styles.waitingSub}>
+                Share the outing code or QR so someone can join before you add a shared payment.
+              </Text>
+              <View style={styles.waitingActionsRow}>
+                {session.join_code ? (
+                  <>
+                    <Button
+                      title="Show QR"
+                      variant="primary"
+                      onPress={() =>
+                        router.push({
+                          pathname: '/outings/qr',
+                          params: { code: session.join_code, name: session.name || '' },
+                        })
+                      }
+                      style={styles.waitingBtn}
+                    />
+                    <Button
+                      title="Copy Code"
+                      variant="outline"
+                      onPress={async () => {
+                        if (!session.join_code) return;
+                        await Clipboard.setStringAsync(session.join_code);
+                        showToast(`Outing code ${session.join_code} copied!`, 'info');
+                      }}
+                      style={styles.waitingBtn}
+                    />
+                  </>
+                ) : null}
+              </View>
+            </View>
+          ) : (
+            <EmptyState
+              icon="receipt-outline"
+              title="No payments yet"
+              description="No payments were recorded during this outing."
+            />
+          )
         ) : (
           payments.map((p) => (
             <PaymentCard
@@ -451,5 +497,50 @@ const styles = StyleSheet.create({
   },
   finishBtn: {
     borderColor: colors.primary,
+  },
+  waitingCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: spacing.sm,
+  },
+  waitingIconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  waitingTitle: {
+    fontSize: typography.size.lg,
+    fontWeight: typography.weight.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  waitingSub: {
+    fontSize: typography.size.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 300,
+    marginBottom: spacing.lg,
+  },
+  waitingActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  waitingBtn: {
+    flex: 1,
+    maxWidth: 140,
   },
 });

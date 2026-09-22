@@ -10,6 +10,7 @@ import { ParticipantSelector } from '../../components/ParticipantSelector';
 import { Button } from '../../components/ui/Button';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { colors } from '../../constants/colors';
 import { spacing } from '../../constants/spacing';
 import { typography } from '../../constants/typography';
@@ -43,6 +44,10 @@ export default function AddPaymentScreen() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const otherActiveParticipants = (session?.active_participants ?? []).filter(
+    (p) => p.user_id !== user?.id
+  );
 
   useEffect(() => {
     if (!sessionId) return;
@@ -91,6 +96,11 @@ export default function AddPaymentScreen() {
   };
 
   const handleSubmit = async () => {
+    if (otherActiveParticipants.length === 0) {
+      setFormError('At least one other friend must join before adding a shared payment.');
+      return;
+    }
+
     const totalPaise = parseRupeesToPaise(amountStr);
     if (totalPaise <= 0) {
       setFormError('Please enter a valid amount greater than zero.');
@@ -182,6 +192,31 @@ export default function AddPaymentScreen() {
               router.back();
             } else {
               router.replace('/(tabs)/outings');
+            }
+          }}
+        />
+      </Screen>
+    );
+  }
+
+  if (otherActiveParticipants.length === 0) {
+    return (
+      <Screen contentContainerStyle={styles.container}>
+        <AppHeader
+          title="Add Payment"
+          subtitle={session.name || 'Outing Payment'}
+          showBack
+        />
+        <EmptyState
+          icon="people-outline"
+          title="Waiting for friends"
+          description="At least one other friend must join this outing before you can add a shared payment."
+          actionLabel="Back to Outing"
+          onAction={() => {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace(`/outings/${session.id}`);
             }
           }}
         />
