@@ -7,6 +7,7 @@ export interface User {
   display_name: string;
   username: string;
   status: 'ACTIVE' | 'DISABLED';
+  upi_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -173,6 +174,7 @@ export interface BalancePersonRead {
   user_id: string;
   display_name: string;
   username: string;
+  upi_id?: string | null;
 }
 
 export interface BalanceItem {
@@ -191,6 +193,7 @@ export interface PairwiseBalanceResponse {
   person: BalancePersonRead;
   direction: 'I_OWE' | 'OWED_TO_ME' | 'SETTLED';
   amount_minor: number;
+  counterparty_upi_id?: string | null;
 }
 
 export interface LedgerEntry {
@@ -253,3 +256,36 @@ export interface ApiErrorResponse {
   error: ApiErrorDetail;
   request_id: string;
 }
+
+export interface UserUpiUpdateRequest {
+  upi_id: string | null;
+}
+
+export interface RealtimeTicketResponse {
+  ticket: string;
+  expires_in: number;
+}
+
+export type RealtimeEventType =
+  | 'SESSION_CREATED'
+  | 'SESSION_UPDATED'
+  | 'PARTICIPANT_JOINED'
+  | 'PARTICIPANT_LEFT'
+  | 'SESSION_FINISHED'
+  | 'PAYMENT_CREATED'
+  | 'PAYMENT_VOIDED'
+  | 'SETTLEMENT_CREATED'
+  | 'SETTLEMENT_VOIDED'
+  | 'BALANCE_CHANGED'
+  | 'UPI_PROFILE_UPDATED';
+
+export interface RealtimeEvent {
+  type: RealtimeEventType;
+  session_id?: string;
+  payment_id?: string;
+  settlement_id?: string;
+  user_id?: string;
+  from_user_id?: string;
+  to_user_id?: string;
+}
+

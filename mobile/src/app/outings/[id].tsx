@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -25,6 +25,7 @@ import { spacing } from '../../constants/spacing';
 import { typography } from '../../constants/typography';
 import { radius } from '../../constants/radius';
 import { api } from '../../lib/apiClient';
+import { realtime } from '../../lib/realtime';
 import { useAuthStore } from '../../stores/authStore';
 import { useToastStore } from '../../stores/toastStore';
 import {
@@ -85,6 +86,15 @@ export default function OutingDetailScreen() {
       loadData(false);
     }, [loadData])
   );
+
+  useEffect(() => {
+    const unsub = realtime.subscribe((event) => {
+      if (!event.session_id || event.session_id === id) {
+        loadData(false);
+      }
+    });
+    return unsub;
+  }, [id, loadData]);
 
   const handleLeaveOuting = async () => {
     if (!id) return;
@@ -247,17 +257,17 @@ export default function OutingDetailScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Payments</Text>
-          {canAddPayment && (
-            <TouchableOpacity
-              style={styles.addPaymentHeaderBtn}
-              onPress={() => router.push(`/payments/add?sessionId=${session.id}`)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name="add" size={18} color={colors.primary} />
-              <Text style={styles.addPaymentHeaderText}>Add Payment</Text>
-            </TouchableOpacity>
-          )}
         </View>
+
+        {canAddPayment && (
+          <Button
+            title="Add Payment"
+            icon={<Ionicons name="add" size={20} color={colors.textInverse} style={{ marginRight: 6 }} />}
+            variant="primary"
+            onPress={() => router.push(`/payments/add?sessionId=${session.id}`)}
+            style={styles.prominentAddPaymentBtn}
+          />
+        )}
 
         {payments.length === 0 ? (
           canAddPayment ? (
@@ -265,8 +275,6 @@ export default function OutingDetailScreen() {
               icon="receipt-outline"
               title="No payments yet"
               description="When anyone pays for food, tickets, or drinks, record it here to split."
-              actionLabel="Add First Payment"
-              onAction={() => router.push(`/payments/add?sessionId=${session.id}`)}
             />
           ) : isActive && isUserActive && otherActiveParticipants.length === 0 ? (
             <View style={styles.waitingCard}>
@@ -456,15 +464,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  addPaymentHeaderBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  addPaymentHeaderText: {
-    fontSize: typography.size.sm,
-    fontWeight: typography.weight.semibold,
-    color: colors.primary,
+  prominentAddPaymentBtn: {
+    marginBottom: spacing.base,
+    width: '100%',
   },
   participantsList: {
     flexDirection: 'row',

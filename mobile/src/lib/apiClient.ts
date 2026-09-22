@@ -187,6 +187,14 @@ export const api = {
     return request<T>(endpoint, 'POST', body, options);
   },
 
+  patch<T>(endpoint: string, body?: unknown, options?: RequestOptions): Promise<T> {
+    return request<T>(endpoint, 'PATCH', body, options);
+  },
+
+  put<T>(endpoint: string, body?: unknown, options?: RequestOptions): Promise<T> {
+    return request<T>(endpoint, 'PUT', body, options);
+  },
+
   delete<T>(endpoint: string, options?: RequestOptions): Promise<T> {
     return request<T>(endpoint, 'DELETE', undefined, options);
   },

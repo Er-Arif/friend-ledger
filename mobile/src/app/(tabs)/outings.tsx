@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   RefreshControl,
   StyleSheet,
@@ -17,6 +17,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { colors } from '../../constants/colors';
 import { spacing } from '../../constants/spacing';
 import { api } from '../../lib/apiClient';
+import { realtime } from '../../lib/realtime';
 import { SessionListItem, SessionListResponse } from '../../types/api';
 import { getFriendlyErrorMessage } from '../../lib/errors';
 
@@ -53,6 +54,21 @@ export default function OutingsScreen() {
       fetchOutings(false);
     }, [fetchOutings])
   );
+
+  useEffect(() => {
+    const unsub = realtime.subscribe((event) => {
+      if (
+        event.type === 'SESSION_CREATED' ||
+        event.type === 'SESSION_UPDATED' ||
+        event.type === 'PARTICIPANT_JOINED' ||
+        event.type === 'PARTICIPANT_LEFT' ||
+        event.type === 'SESSION_FINISHED'
+      ) {
+        fetchOutings(false);
+      }
+    });
+    return unsub;
+  }, [fetchOutings]);
 
   const activeOutings = sessions.filter((s) => s.status === 'ACTIVE');
   const pastOutings = sessions.filter((s) => s.status === 'CLOSED');

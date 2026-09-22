@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   RefreshControl,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Screen } from '../../components/ui/Screen';
 import { AppHeader } from '../../components/ui/AppHeader';
 import { Avatar } from '../../components/ui/Avatar';
@@ -19,6 +20,7 @@ import { spacing } from '../../constants/spacing';
 import { typography } from '../../constants/typography';
 import { radius } from '../../constants/radius';
 import { api } from '../../lib/apiClient';
+import { realtime } from '../../lib/realtime';
 import { PairwiseLedgerResponse } from '../../types/api';
 import { getFriendlyErrorMessage } from '../../lib/errors';
 import { formatMoney } from '../../utils/money';
@@ -58,6 +60,21 @@ export default function PairwiseLedgerScreen() {
       fetchLedger(false);
     }, [fetchLedger])
   );
+
+  useEffect(() => {
+    const unsub = realtime.subscribe((event) => {
+      if (
+        event.type === 'PAYMENT_CREATED' ||
+        event.type === 'PAYMENT_VOIDED' ||
+        event.type === 'SETTLEMENT_CREATED' ||
+        event.type === 'SETTLEMENT_VOIDED' ||
+        event.type === 'BALANCE_CHANGED'
+      ) {
+        fetchLedger(false);
+      }
+    });
+    return unsub;
+  }, [fetchLedger]);
 
   if (isLoading && !ledger) {
     return (
@@ -145,6 +162,25 @@ export default function PairwiseLedgerScreen() {
                   toUserId: person.user_id,
                   toName: person.display_name,
                   maxAmountMinor: balance.amount_minor.toString(),
+                  counterpartyUpiId: balance.counterparty_upi_id || '',
+                },
+              })
+            }
+            style={styles.settleBtn}
+          />
+        )}
+
+        {isOwedToMe && balance.amount_minor > 0 && (
+          <Button
+            title="Collect via UPI"
+            icon={<Ionicons name="qr-code-outline" size={18} color={colors.textInverse} style={{ marginRight: 6 }} />}
+            onPress={() =>
+              router.push({
+                pathname: '/settlements/collect',
+                params: {
+                  userId: person.user_id,
+                  name: person.display_name,
+                  amountMinor: balance.amount_minor.toString(),
                 },
               })
             }

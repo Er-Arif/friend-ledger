@@ -9,6 +9,7 @@ class BalancePersonRead(BaseModel):
     user_id: UUID
     display_name: str
     username: str
+    upi_id: str | None = None
 
 
 class BalanceItem(BaseModel):
@@ -27,6 +28,7 @@ class PairwiseBalanceResponse(BaseModel):
     person: BalancePersonRead
     direction: Literal["I_OWE", "OWED_TO_ME", "SETTLED"]
     amount_minor: int
+    counterparty_upi_id: str | None = None
 
 
 class LedgerEntry(BaseModel):

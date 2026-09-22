@@ -23,6 +23,7 @@ It translates the approved Product Requirements and System & Domain Architecture
 * error contracts.
 
 This stage does **not** create production SQL migrations or application code.
+For Stage 7 database schema additions (`users.upi_id`) and new API contracts (`PATCH /api/v1/me/upi`, `POST /api/v1/realtime/ticket`, `WS /api/v1/realtime/ws`), see [Stage 7 Specification](05_STAGE7_REALTIME_UPI_ENHANCEMENTS.md).
 
 ---
 

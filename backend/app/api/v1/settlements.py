@@ -18,6 +18,7 @@ from app.services.idempotency import (
     build_request_hash,
     complete_idempotent_operation,
 )
+from app.services.realtime import broadcast_event
 from app.services.settlements import (
     create_settlement,
     get_settlement_for_user,
@@ -146,6 +147,16 @@ def record_settlement(
 
     db.commit()
 
+    broadcast_event(
+        [settlement.from_user_id, settlement.to_user_id],
+        {
+            "type": "SETTLEMENT_CREATED",
+            "settlement_id": str(settlement.id),
+            "from_user_id": str(settlement.from_user_id),
+            "to_user_id": str(settlement.to_user_id),
+        },
+    )
+
     return response
 
 
@@ -243,5 +254,15 @@ def void_existing_settlement(
     )
 
     db.commit()
+
+    broadcast_event(
+        [settlement.from_user_id, settlement.to_user_id],
+        {
+            "type": "SETTLEMENT_VOIDED",
+            "settlement_id": str(settlement.id),
+            "from_user_id": str(settlement.from_user_id),
+            "to_user_id": str(settlement.to_user_id),
+        },
+    )
 
     return response

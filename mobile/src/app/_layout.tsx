@@ -7,6 +7,7 @@ import { spacing } from '../constants/spacing';
 import { typography } from '../constants/typography';
 import { useAuthStore } from '../stores/authStore';
 import { Toast } from '../components/ui/Toast';
+import { realtime } from '../lib/realtime';
 
 export default function RootLayout() {
   const { isAuthenticated, isLoading, initialize } = useAuthStore();
@@ -16,6 +17,14 @@ export default function RootLayout() {
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      realtime.connect();
+    } else {
+      realtime.disconnect();
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isLoading) return;

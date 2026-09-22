@@ -8,13 +8,18 @@ import { Avatar } from '../../components/ui/Avatar';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { FormField } from '../../components/ui/FormField';
 import { colors } from '../../constants/colors';
 import { spacing } from '../../constants/spacing';
 import { typography } from '../../constants/typography';
 import { radius } from '../../constants/radius';
+import { api } from '../../lib/apiClient';
+import { getFriendlyErrorMessage } from '../../lib/errors';
 import { useAuthStore } from '../../stores/authStore';
 import { useToastStore } from '../../stores/toastStore';
+import { User } from '../../types/api';
 import { formatDate } from '../../utils/dates';
+import { validateUpiId } from '../../utils/upi';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -23,6 +28,47 @@ export default function ProfileScreen() {
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // UPI configuration state
+  const [isEditingUpi, setIsEditingUpi] = useState(false);
+  const [upiInput, setUpiInput] = useState('');
+  const [upiError, setUpiError] = useState<string | null>(null);
+  const [isSavingUpi, setIsSavingUpi] = useState(false);
+
+  const handleStartEditUpi = () => {
+    setUpiInput(user?.upi_id || '');
+    setUpiError(null);
+    setIsEditingUpi(true);
+  };
+
+  const handleSaveUpi = async () => {
+    const trimmed = upiInput.trim();
+    if (trimmed) {
+      const err = validateUpiId(trimmed);
+      if (err) {
+        setUpiError(err);
+        return;
+      }
+    }
+
+    setIsSavingUpi(true);
+    setUpiError(null);
+    try {
+      const updatedUser = await api.patch<User>('/api/v1/me/upi', {
+        upi_id: trimmed || null,
+      });
+      useAuthStore.getState().setUser(updatedUser);
+      setIsEditingUpi(false);
+      showToast(
+        trimmed ? 'UPI ID updated successfully' : 'UPI ID removed',
+        'success'
+      );
+    } catch (err) {
+      setUpiError(getFriendlyErrorMessage(err));
+    } finally {
+      setIsSavingUpi(false);
+    }
+  };
 
   const handleCopyUserId = async () => {
     if (user?.id) {
@@ -90,6 +136,62 @@ export default function ProfileScreen() {
               {user?.id ? `${user.id.slice(0, 8)}...` : '—'}
             </Text>
           </View>
+        </Card>
+      </View>
+
+      {/* Payment Details */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Payment Details</Text>
+        <Card style={styles.infoCard}>
+          {!isEditingUpi ? (
+            <View style={styles.upiRow}>
+              <View style={styles.upiTextContainer}>
+                <Text style={styles.infoLabel}>UPI ID</Text>
+                <Text style={[styles.infoValue, !user?.upi_id && styles.unsetUpiText]}>
+                  {user?.upi_id || 'Not configured'}
+                </Text>
+              </View>
+              <Button
+                title={user?.upi_id ? 'Edit' : 'Add UPI ID'}
+                variant={user?.upi_id ? 'outline' : 'primary'}
+                size="small"
+                onPress={handleStartEditUpi}
+              />
+            </View>
+          ) : (
+            <View style={styles.editUpiContainer}>
+              <FormField
+                label="UPI ID"
+                value={upiInput}
+                onChangeText={(text) => {
+                  setUpiInput(text);
+                  if (upiError) setUpiError(null);
+                }}
+                placeholder="e.g. arif@okaxis"
+                autoCapitalize="none"
+                autoCorrect={false}
+                error={upiError || undefined}
+                helperText="Used to generate payment QR codes so friends can settle debts."
+              />
+              <View style={styles.upiActionRow}>
+                <Button
+                  title="Cancel"
+                  variant="outline"
+                  size="small"
+                  onPress={() => setIsEditingUpi(false)}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  title="Save"
+                  variant="primary"
+                  size="small"
+                  loading={isSavingUpi}
+                  onPress={handleSaveUpi}
+                  style={{ flex: 1 }}
+                />
+              </View>
+            </View>
+          )}
         </Card>
       </View>
 
@@ -223,5 +325,27 @@ const styles = StyleSheet.create({
   logoutSection: {
     marginTop: spacing.sm,
     marginBottom: spacing.xl,
+  },
+  upiRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xs,
+  },
+  upiTextContainer: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  unsetUpiText: {
+    color: colors.textMuted,
+    fontStyle: 'italic',
+  },
+  editUpiContainer: {
+    paddingVertical: spacing.xs,
+  },
+  upiActionRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
 });

@@ -13,6 +13,13 @@ import {
 } from '../src/utils/qr.ts';
 
 import {
+  buildUpiPaymentUri,
+  buildUpiQrPayload,
+  formatUpiAmount,
+  validateUpiId,
+} from '../src/utils/upi.ts';
+
+import {
   validateDisplayName,
   validateJoinCode,
   validatePassword,
@@ -200,3 +207,83 @@ describe('Error Handling & Mapping', () => {
     assert.equal(getFriendlyErrorMessage(unknownErr), 'Something went wrong. Please try again.');
   });
 });
+
+describe('UPI Utilities', () => {
+  it('formats minor units (paise) to exact decimal INR string without float rounding drift', () => {
+    assert.equal(formatUpiAmount(0), '0.00');
+    assert.equal(formatUpiAmount(1), '0.01');
+    assert.equal(formatUpiAmount(10), '0.10');
+    assert.equal(formatUpiAmount(100), '1.00');
+    assert.equal(formatUpiAmount(105), '1.05');
+    assert.equal(formatUpiAmount(50000), '500.00');
+    assert.equal(formatUpiAmount(99999), '999.99');
+    assert.equal(formatUpiAmount(10000000), '100000.00');
+    assert.equal(formatUpiAmount(-100), '0.00');
+  });
+
+  it('validates UPI ID format and rejects invalid VPAs', () => {
+    // Valid cases
+    assert.equal(validateUpiId('friend@okaxis'), null);
+    assert.equal(validateUpiId('user.name@oksbi'), null);
+    assert.equal(validateUpiId('merchant-store@icici'), null);
+    assert.equal(validateUpiId('user_99@paytm'), null);
+
+    // Required / empty checks
+    assert.ok(validateUpiId(''));
+    assert.ok(validateUpiId('   '));
+    assert.ok(validateUpiId(null));
+    assert.ok(validateUpiId(undefined));
+
+    // Whitespace checks
+    assert.match(validateUpiId('user @okaxis') || '', /cannot contain spaces/);
+    assert.match(validateUpiId('user@ okaxis') || '', /cannot contain spaces/);
+    assert.match(validateUpiId('user name@okhdfc') || '', /cannot contain spaces/);
+
+    // @ symbol counts
+    assert.match(validateUpiId('userwithoutat') || '', /must contain exactly one @ symbol/);
+    assert.match(validateUpiId('user@@bank') || '', /must contain exactly one @ symbol/);
+    assert.match(validateUpiId('user@bank@other') || '', /must contain exactly one @ symbol/);
+
+    // Character set & format
+    assert.match(validateUpiId('user!@bank') || '', /Invalid UPI ID format/);
+    assert.match(validateUpiId('user#@bank') || '', /Invalid UPI ID format/);
+    assert.match(validateUpiId('a@b') || '', /Invalid UPI ID format/);
+    assert.match(validateUpiId('ab') || '', /must be between 3 and 128 characters/);
+  });
+
+  it('builds standardized upi://pay URI with encoded parameters', () => {
+    const uri = buildUpiPaymentUri({
+      payeeUpiId: 'friend@okaxis',
+      payeeName: 'John Doe',
+      amountMinor: 25050,
+      transactionNote: 'Dinner share',
+      transactionRef: 'ref-9988',
+    });
+
+    assert.ok(uri.startsWith('upi://pay?'));
+    const url = new URL(uri);
+    assert.equal(url.searchParams.get('pa'), 'friend@okaxis');
+    assert.equal(url.searchParams.get('pn'), 'John Doe');
+    assert.equal(url.searchParams.get('am'), '250.50');
+    assert.equal(url.searchParams.get('cu'), 'INR');
+    assert.equal(url.searchParams.get('tn'), 'Dinner share');
+    assert.equal(url.searchParams.get('tr'), 'ref-9988');
+  });
+
+  it('builds UPI QR payload identical to payment URI and uses default note', () => {
+    const payload = buildUpiQrPayload({
+      payeeUpiId: 'merchant@upi',
+      payeeName: 'Cafe Coffee Day & Tea',
+      amountMinor: 50000,
+    });
+
+    const url = new URL(payload);
+    assert.equal(url.searchParams.get('pa'), 'merchant@upi');
+    assert.equal(url.searchParams.get('pn'), 'Cafe Coffee Day & Tea');
+    assert.equal(url.searchParams.get('am'), '500.00');
+    assert.equal(url.searchParams.get('cu'), 'INR');
+    assert.equal(url.searchParams.get('tn'), 'Friend Ledger settlement');
+    assert.equal(url.searchParams.get('tr'), null);
+  });
+});
+

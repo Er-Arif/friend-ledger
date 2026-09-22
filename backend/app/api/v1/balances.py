@@ -24,11 +24,12 @@ router = APIRouter(
 )
 
 
-def build_person(user) -> BalancePersonRead:
+def build_person(user, include_upi: bool = False) -> BalancePersonRead:
     return BalancePersonRead(
         user_id=user.id,
         display_name=user.display_name,
         username=user.username,
+        upi_id=user.upi_id if include_upi else None,
     )
 
 
@@ -123,9 +124,10 @@ def get_balance_with_person(
         amount_minor = 0
 
     return PairwiseBalanceResponse(
-        person=build_person(person),
+        person=build_person(person, include_upi=True),
         direction=direction,
         amount_minor=amount_minor,
+        counterparty_upi_id=person.upi_id,
     )
 
 
@@ -166,7 +168,7 @@ def get_ledger_with_person(
         other_user_id=user_id,
     )
 
-    person_read = build_person(person)
+    person_read = build_person(person, include_upi=True)
 
     return PairwiseLedgerResponse(
         person=person_read,
@@ -174,6 +176,7 @@ def get_ledger_with_person(
             person=person_read,
             direction=balance_direction,
             amount_minor=balance_amount_minor,
+            counterparty_upi_id=person.upi_id,
         ),
                 entries=[
             LedgerEntry(

@@ -28,6 +28,7 @@ from app.services.payments import (
     list_session_payments,
     void_payment,
 )
+from app.services.realtime import broadcast_event
 
 router = APIRouter(
     tags=["Payments"],
@@ -180,7 +181,22 @@ def add_payment(
         ),
     )
 
+    participant_ids = (
+        {p.user_id for p in payment.session.participations}
+        | {s.user_id for s in payment.shares}
+        | {payment.payer_user_id}
+    )
+
     db.commit()
+
+    broadcast_event(
+        participant_ids,
+        {
+            "type": "PAYMENT_CREATED",
+            "session_id": str(session_id),
+            "payment_id": str(payment.id),
+        },
+    )
 
     return response
 
@@ -305,6 +321,21 @@ def void_existing_payment(
         ),
     )
 
+    participant_ids = (
+        {p.user_id for p in payment.session.participations}
+        | {s.user_id for s in payment.shares}
+        | {payment.payer_user_id}
+    )
+
     db.commit()
+
+    broadcast_event(
+        participant_ids,
+        {
+            "type": "PAYMENT_VOIDED",
+            "session_id": str(payment.session_id),
+            "payment_id": str(payment.id),
+        },
+    )
 
     return response

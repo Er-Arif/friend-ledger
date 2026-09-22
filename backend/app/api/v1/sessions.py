@@ -19,6 +19,7 @@ from app.schemas.session import (
     SessionListResponse,
 )
 from app.services.audit import record_audit_event
+from app.services.realtime import broadcast_event
 from app.services.sessions import (
     count_active_participants,
     create_outing,
@@ -66,6 +67,14 @@ def create_session(
 
     db.commit()
 
+    broadcast_event(
+        [current_user.id],
+        {
+            "type": "SESSION_CREATED",
+            "session_id": str(outing.id),
+        },
+    )
+
     return SessionCreateResponse(
         id=outing.id,
         name=outing.name,
@@ -104,7 +113,20 @@ def join_session(
     },
 )
 
+    active_participant_ids = [
+        p.user_id for p in outing.participations if p.left_at is None
+    ]
+
     db.commit()
+
+    broadcast_event(
+        active_participant_ids,
+        {
+            "type": "PARTICIPANT_JOINED",
+            "session_id": str(outing.id),
+            "user_id": str(current_user.id),
+        },
+    )
 
     return SessionJoinResponse(
         session=SessionBasicRead(
@@ -238,7 +260,18 @@ def leave_session(
     },
 )
 
+    notify_user_ids = {p.user_id for p in outing.participations if p.left_at is None} | {current_user.id}
+
     db.commit()
+
+    broadcast_event(
+        notify_user_ids,
+        {
+            "type": "PARTICIPANT_LEFT",
+            "session_id": str(outing.id),
+            "user_id": str(current_user.id),
+        },
+    )
 
     assert participation.left_at is not None
 
@@ -279,7 +312,17 @@ def finish_session(
     },
 )
 
+    notify_user_ids = {p.user_id for p in outing.participations}
+
     db.commit()
+
+    broadcast_event(
+        notify_user_ids,
+        {
+            "type": "SESSION_FINISHED",
+            "session_id": str(outing.id),
+        },
+    )
 
     assert outing.closed_at is not None
 

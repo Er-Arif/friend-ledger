@@ -20,6 +20,7 @@ It translates the approved Product Requirements Baseline into technical rules th
 * automated tests
 
 This document does not define the final physical PostgreSQL schema or production application code.
+For Stage 7 enhancements (Prominent Add Payment CTA, UPI-assisted settlements & QR collection, and ticket-authenticated realtime synchronization), see [Stage 7 Specification](05_STAGE7_REALTIME_UPI_ENHANCEMENTS.md).
 
 ---
 

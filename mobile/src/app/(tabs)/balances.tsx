@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   RefreshControl,
   StyleSheet,
@@ -19,6 +19,7 @@ import { spacing } from '../../constants/spacing';
 import { typography } from '../../constants/typography';
 import { radius } from '../../constants/radius';
 import { api } from '../../lib/apiClient';
+import { realtime } from '../../lib/realtime';
 import { BalanceItem, BalanceSummaryResponse } from '../../types/api';
 import { getFriendlyErrorMessage } from '../../lib/errors';
 
@@ -55,6 +56,21 @@ export default function BalancesScreen() {
       fetchBalances(false);
     }, [fetchBalances])
   );
+
+  useEffect(() => {
+    const unsub = realtime.subscribe((event) => {
+      if (
+        event.type === 'PAYMENT_CREATED' ||
+        event.type === 'PAYMENT_VOIDED' ||
+        event.type === 'SETTLEMENT_CREATED' ||
+        event.type === 'SETTLEMENT_VOIDED' ||
+        event.type === 'BALANCE_CHANGED'
+      ) {
+        fetchBalances(false);
+      }
+    });
+    return unsub;
+  }, [fetchBalances]);
 
   const items = data?.items ?? [];
   const iOweItems = items.filter((item) => item.direction === 'I_OWE');

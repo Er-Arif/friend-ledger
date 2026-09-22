@@ -71,6 +71,12 @@ class User(Base):
         server_default=text("'ACTIVE'"),
     )
 
+    upi_id: Mapped[str | None] = mapped_column(
+        String(128),
+        nullable=True,
+        default=None,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
