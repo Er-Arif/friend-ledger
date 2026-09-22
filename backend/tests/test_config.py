@@ -15,6 +15,17 @@ def test_settings_database_url_normalization() -> None:
     assert settings.test_database_url is not None
     assert settings.test_database_url.startswith("postgresql+psycopg://")
 
+    # Verify postgres:// scheme as used by Railway / cloud providers
+    railway_style_settings = Settings(
+        database_url="postgres://user:pass@roundhouse.proxy.rlwy.net:12345/railway",
+        test_database_url="postgres://user:pass@roundhouse.proxy.rlwy.net:12345/test",
+        jwt_secret=SecretStr("supersecretkeythatislongerthan32characters!"),
+        app_env="development",
+    )
+    assert railway_style_settings.database_url.startswith("postgresql+psycopg://")
+    assert railway_style_settings.test_database_url is not None
+    assert railway_style_settings.test_database_url.startswith("postgresql+psycopg://")
+
 
 def test_settings_rejects_empty_database_url() -> None:
     with pytest.raises(ValidationError):

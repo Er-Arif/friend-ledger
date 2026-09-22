@@ -2,6 +2,9 @@ import { AppState } from 'react-native';
 import { api } from './apiClient';
 import { RealtimeEvent, RealtimeTicketResponse } from '../types/api';
 import { useAuthStore } from '../stores/authStore';
+import { deriveWebSocketUrl } from '../utils/realtimeUrl';
+
+export { deriveWebSocketUrl };
 
 const RECONNECT_INTERVALS_MS = [1000, 2000, 5000, 10000, 30000];
 
@@ -40,9 +43,7 @@ class RealtimeService {
   }
 
   private getWsUrl(ticket: string): string {
-    const httpBase = api.getBaseUrl();
-    const wsBase = httpBase.replace(/^http:\/\//, 'ws://').replace(/^https:\/\//, 'wss://');
-    return `${wsBase}/api/v1/realtime/ws?ticket=${encodeURIComponent(ticket)}`;
+    return deriveWebSocketUrl(api.getBaseUrl(), ticket);
   }
 
   public async connect(): Promise<void> {

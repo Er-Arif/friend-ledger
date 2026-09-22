@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Friend Ledger API"
-    app_version: str = "0.1.0"
+    app_version: str = "1.0.0"
     app_env: str = "development"
     database_url: str
     test_database_url: str | None = None
@@ -69,8 +69,12 @@ class Settings(BaseSettings):
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("DATABASE_URL cannot be empty.")
-        if cleaned.startswith("postgresql://"):
-            return cleaned.replace(
+        if cleaned.startswith("postgres://"):
+            cleaned = cleaned.replace(
+                "postgres://", "postgresql+psycopg://", 1
+            )
+        elif cleaned.startswith("postgresql://"):
+            cleaned = cleaned.replace(
                 "postgresql://", "postgresql+psycopg://", 1
             )
         if not cleaned.startswith("postgresql+psycopg://"):
@@ -89,8 +93,12 @@ class Settings(BaseSettings):
         cleaned = value.strip()
         if not cleaned:
             return None
-        if cleaned.startswith("postgresql://"):
-            return cleaned.replace(
+        if cleaned.startswith("postgres://"):
+            cleaned = cleaned.replace(
+                "postgres://", "postgresql+psycopg://", 1
+            )
+        elif cleaned.startswith("postgresql://"):
+            cleaned = cleaned.replace(
                 "postgresql://", "postgresql+psycopg://", 1
             )
         if not cleaned.startswith("postgresql+psycopg://"):

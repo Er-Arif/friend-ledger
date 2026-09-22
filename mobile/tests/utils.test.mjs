@@ -20,6 +20,10 @@ import {
 } from '../src/utils/upi.ts';
 
 import {
+  deriveWebSocketUrl,
+} from '../src/utils/realtimeUrl.ts';
+
+import {
   validateDisplayName,
   validateJoinCode,
   validatePassword,
@@ -286,4 +290,32 @@ describe('UPI Utilities', () => {
     assert.equal(url.searchParams.get('tr'), null);
   });
 });
+
+describe('Realtime URL Derivation', () => {
+  it('converts development http to ws', () => {
+    const wsUrl = deriveWebSocketUrl('http://127.0.0.1:8000', 'ticket123');
+    assert.equal(wsUrl, 'ws://127.0.0.1:8000/api/v1/realtime/ws?ticket=ticket123');
+  });
+
+  it('converts development http with trailing slash to ws without double slash', () => {
+    const wsUrl = deriveWebSocketUrl('http://localhost:8000/', 'ticket123');
+    assert.equal(wsUrl, 'ws://localhost:8000/api/v1/realtime/ws?ticket=ticket123');
+  });
+
+  it('converts production https to secure wss', () => {
+    const wsUrl = deriveWebSocketUrl('https://api.friendledger.com', 'ticket-abc');
+    assert.equal(wsUrl, 'wss://api.friendledger.com/api/v1/realtime/ws?ticket=ticket-abc');
+  });
+
+  it('converts production https with trailing slash to wss', () => {
+    const wsUrl = deriveWebSocketUrl('https://api.friendledger.com/', 'ticket-abc');
+    assert.equal(wsUrl, 'wss://api.friendledger.com/api/v1/realtime/ws?ticket=ticket-abc');
+  });
+
+  it('encodes special characters in realtime ticket parameter', () => {
+    const wsUrl = deriveWebSocketUrl('https://api.friendledger.com', 'tok+en/123==');
+    assert.equal(wsUrl, 'wss://api.friendledger.com/api/v1/realtime/ws?ticket=tok%2Ben%2F123%3D%3D');
+  });
+});
+
 
