@@ -1,0 +1,61 @@
+warning: in the working copy of 'backend/Dockerfile', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'mobile/eas.json', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/backend/Dockerfile b/backend/Dockerfile[m
+[1mindex 2a39a40..e7e830e 100644[m
+[1m--- a/backend/Dockerfile[m
+[1m+++ b/backend/Dockerfile[m
+[36m@@ -7,18 +7,17 @@[m [mENV UV_COMPILE_BYTECODE=1 \[m
+ [m
+ WORKDIR /app[m
+ [m
+[31m-# Install dependencies using uv sync cache[m
+[31m-RUN --mount=type=cache,target=/root/.cache/uv \[m
+[31m-    --mount=type=bind,source=uv.lock,target=uv.lock \[m
+[31m-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \[m
+[31m-    uv sync --frozen --no-dev --no-install-project[m
+[32m+[m[32m# Copy dependency definition files[m
+[32m+[m[32mCOPY pyproject.toml uv.lock ./[m
+[32m+[m
+[32m+[m[32m# Install dependencies[m
+[32m+[m[32mRUN uv sync --frozen --no-dev --no-install-project[m
+ [m
+ # Copy application sources[m
+ COPY . /app[m
+ [m
+ # Sync project package[m
+[31m-RUN --mount=type=cache,target=/root/.cache/uv \[m
+[31m-    uv sync --frozen --no-dev[m
+[32m+[m[32mRUN uv sync --frozen --no-dev[m
+ [m
+ # Final slim runtime container[m
+ FROM python:3.13-slim-bookworm[m
+[36m@@ -37,5 +36,5 @@[m [mENV PATH="/app/.venv/bin:$PATH" \[m
+ [m
+ EXPOSE 8000[m
+ [m
+[31m-# Execute pre-deploy migrations before launching the ASGI server[m
+[31m-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"][m
+[32m+[m[32m# Start the ASGI server using Railway's injected PORT[m
+[32m+[m[32mCMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"][m
+[1mdiff --git a/mobile/eas.json b/mobile/eas.json[m
+[1mindex a47ad25..9508ce7 100644[m
+[1m--- a/mobile/eas.json[m
+[1m+++ b/mobile/eas.json[m
+[36m@@ -15,7 +15,7 @@[m
+     "preview": {[m
+       "distribution": "internal",[m
+       "env": {[m
+[31m-        "EXPO_PUBLIC_API_BASE_URL": "https://api.friendledger.com"[m
+[32m+[m[32m        "EXPO_PUBLIC_API_BASE_URL": "https://backend-production-a749.up.railway.app"[m
+       },[m
+       "ios": {[m
+         "simulator": false[m
+[36m@@ -24,7 +24,7 @@[m
+     "production": {[m
+       "autoIncrement": true,[m
+       "env": {[m
+[31m-        "EXPO_PUBLIC_API_BASE_URL": "https://api.friendledger.com"[m
+[32m+[m[32m        "EXPO_PUBLIC_API_BASE_URL": "https://backend-production-a749.up.railway.app"[m
+       },[m
+       "ios": {[m
+         "simulator": false[m

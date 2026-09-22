@@ -7,18 +7,17 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 WORKDIR /app
 
-# Install dependencies using uv sync cache
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-dev --no-install-project
+# Copy dependency definition files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application sources
 COPY . /app
 
 # Sync project package
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev
 
 # Final slim runtime container
 FROM python:3.13-slim-bookworm
@@ -37,5 +36,5 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 EXPOSE 8000
 
-# Execute pre-deploy migrations before launching the ASGI server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Start the ASGI server using Railway's injected PORT
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
