@@ -1,7 +1,7 @@
 # Friend Ledger — Production Deployment & Release Guide
 
 **Release Version**: v1.0.0 Release Candidate  
-**Target Architecture**: Railway (FastAPI + PostgreSQL) & Expo Application Services (iOS TestFlight)  
+**Target Architecture**: Railway (FastAPI + PostgreSQL) & Expo Application Services (Android APK Direct Distribution)  
 
 ---
 
@@ -185,16 +185,26 @@ The mobile app communicates with the backend via HTTPS and WSS derived from `EXP
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://<your-railway-api-domain>"
+        "EXPO_PUBLIC_API_BASE_URL": "https://backend-production-a749.up.railway.app"
       },
-      "ios": { "simulator": false }
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://<your-railway-api-domain>"
+        "EXPO_PUBLIC_API_BASE_URL": "https://backend-production-a749.up.railway.app"
       },
-      "ios": { "simulator": false }
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "simulator": false
+      }
     }
   }
 }
@@ -202,14 +212,44 @@ The mobile app communicates with the backend via HTTPS and WSS derived from `EXP
 
 ---
 
-## 8. TestFlight Distribution Process
+## 8. Android Distribution Process (Active Release Path)
 
-### Prerequisites
+Friend Ledger v1 distribution is **Android-only**, distributed via a directly installable standalone Android APK.
+
+### 8.1 Build Installable Android APK
+1. **Prerequisites**:
+   - EAS CLI installed (`npm install -g eas-cli`).
+   - Logged into Expo account (`eas login`).
+   - Android package: `com.erarif.friendledger`.
+2. **Execute Build**:
+   ```bash
+   cd mobile
+   eas build --platform android --profile preview
+   ```
+3. **Build Artifact**:
+   - EAS Build compiles a standalone `.apk` using the `preview` profile (`buildType: "apk"`).
+   - Injects `EXPO_PUBLIC_API_BASE_URL: https://backend-production-a749.up.railway.app`.
+   - On completion, EAS outputs a download link and terminal QR code.
+4. **Device Installation (Sideloading)**:
+   - Download the `.apk` directly to the target Android device via browser or terminal QR code.
+   - When prompted, enable "Install unknown apps" for your browser/file manager.
+   - Install and launch Friend Ledger.
+
+### 8.2 Production Profile (Future Google Play Readiness)
+- The `production` profile in `mobile/eas.json` is configured for `"buildType": "app-bundle"` (`.aab`).
+- Google Play submission is **not currently performed** for v1.
+
+### 8.3 iOS & TestFlight Distribution (Deferred / Inactive for v1)
+
+> [!NOTE]
+> Friend Ledger v1 release and distribution is currently **Android-only**. iOS TestFlight, App Store Connect, and Apple Developer enrollment steps are documented below for historical and architecture reference only, and are **not currently active or pursued**.
+
+#### Historical iOS Prerequisites
 1. Apple Developer Account (Individual or Organization enrollment).
 2. App registered in App Store Connect with bundle identifier matching `app.json` (`com.erarif.friendledger`).
 3. EAS CLI installed (`npm install -g eas-cli`) and logged in (`eas login`).
 
-### Step-by-Step Build & Submit
+#### Historical iOS Build & Submit
 1. Navigate to the mobile directory:
    ```bash
    cd mobile
@@ -218,16 +258,13 @@ The mobile app communicates with the backend via HTTPS and WSS derived from `EXP
    ```bash
    eas build --platform ios --profile production
    ```
-   - EAS will prompt you to log into your Apple Developer account and automatically manage distribution certificates and provisioning profiles.
-   - `"autoIncrement": true` ensures each build receives an incremented `buildNumber`.
 3. Submit the build to App Store Connect / TestFlight:
    ```bash
    eas submit --platform ios --profile production
    ```
-4. Once processed on App Store Connect (usually 10–20 minutes):
-   - Open [App Store Connect](https://appstoreconnect.apple.com) -> **Apps** -> **Friend Ledger** -> **TestFlight**.
-   - Add Internal Testers (immediate access) or External Testers (requires brief Apple Beta Review).
-   - Use copy from `docs/07_APP_STORE_METADATA.md` for "What to Test" notes.
+4. Once processed on App Store Connect:
+   - Open App Store Connect -> Apps -> Friend Ledger -> TestFlight.
+   - Add Internal Testers or External Testers.
 
 ---
 

@@ -102,7 +102,7 @@ friend-ledger/
 │   ├── src/                   # React Native source (app router, components, lib, stores, utils)
 │   ├── tests/                 # Mobile unit test suite (24 tests)
 │   ├── app.json               # Expo application configuration & iOS/Android metadata
-│   ├── eas.json               # EAS build configuration for TestFlight / production
+│   ├── eas.json               # EAS build configuration for Android APK / production
 │   └── package.json           # Mobile npm package manifest and dependencies
 ├── docs/                      # Authoritative architecture and release specifications
 └── README.md                  # Project overview and developer guide
@@ -232,7 +232,7 @@ Comprehensive design specifications and operational guides are maintained in [`d
 * [04 — Mobile UX/UI Specification](docs/04_MOBILE_UX_UI_SPECIFICATION.md)
 * [05 — Stage 7 Realtime & UPI Enhancements](docs/05_STAGE7_REALTIME_UPI_ENHANCEMENTS.md)
 * [06 — Production Deployment & Release Guide](docs/06_PRODUCTION_RELEASE_GUIDE.md)
-* [07 — App Store & TestFlight Metadata](docs/07_APP_STORE_METADATA.md)
+* [07 — Store & Distribution Metadata](docs/07_APP_STORE_METADATA.md)
 
 ---
 
@@ -246,7 +246,7 @@ Comprehensive design specifications and operational guides are maintained in [`d
 
 * **Current Version**: `v1.0.0-rc.1`
 * **Backend Production Target**: [Railway](https://railway.com) (FastAPI service + managed PostgreSQL). Configured via [`backend/railway.json`](backend/railway.json) with automated pre-deploy migrations.
-* **Mobile Production Target**: iOS TestFlight via [EAS Build](https://expo.dev/eas). Configured via [`mobile/eas.json`](mobile/eas.json).
+* **Mobile Distribution Target**: Directly installable Android APK via [EAS Build](https://expo.dev/eas) (`preview` profile). (iOS/TestFlight is deferred / inactive for v1).
 * For end-to-end deployment procedures, rollbacks, and the 18-step smoke test checklist, see [`docs/06_PRODUCTION_RELEASE_GUIDE.md`](docs/06_PRODUCTION_RELEASE_GUIDE.md).
 
 ---

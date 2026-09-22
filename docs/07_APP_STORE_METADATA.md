@@ -1,8 +1,13 @@
-# Friend Ledger — App Store & TestFlight Metadata
+# Friend Ledger — Store & Distribution Metadata
+
+> [!NOTE]
+> **Active Distribution**: Friend Ledger v1 is an **Android-only** release distributed via directly installable standalone APK (`eas build --platform android --profile preview`).
+> iOS App Store and TestFlight distribution steps are currently **inactive / not pursued for v1**. Store metadata below is maintained for listing reference and future app store submissions.
 
 **Release**: v1.0.0 Release Candidate  
-**Platform**: iOS (App Store Connect & TestFlight)  
-**Package / Bundle ID**: `com.erarif.friendledger`  
+**Active Platform**: Android (Direct APK via EAS Preview)  
+**Package / Application ID**: `com.erarif.friendledger`  
+**Deferred Platform**: iOS (App Store Connect & TestFlight — Inactive)  
 
 ---
 
@@ -110,7 +115,7 @@ Download Friend Ledger today and experience split bills done right.
 
 ---
 
-## 6. TestFlight Beta Information
+## 6. TestFlight Beta Information (Deferred / Inactive for v1)
 
 ### TestFlight Beta App Description
 ```text
