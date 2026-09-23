@@ -24,7 +24,10 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "output": "static",
@@ -44,13 +47,21 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Friend Ledger to access your camera to scan outing join codes."
+          "cameraPermission": "Allow Friend Ledger to access your camera to scan outing join codes.",
+          "recordAudioAndroid": false
         }
-      ]
+      ],
+      "./plugins/withReleaseSigning"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c126965d-bcbe-4cc9-8b2b-1bb8a45e54d1"
+      }
     }
   }
 }

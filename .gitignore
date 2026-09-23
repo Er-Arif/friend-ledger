@@ -19,6 +19,17 @@ htmlcov/
 .env.*
 !.env.example
 
+# Android Signing Credentials
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+local.properties
+
+# Android Build Artifacts
+*.apk
+*.aab
+
 # IDE
 .vscode/
 .idea/

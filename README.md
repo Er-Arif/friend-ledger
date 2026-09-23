@@ -242,12 +242,64 @@ Comprehensive design specifications and operational guides are maintained in [`d
 
 ---
 
-## Release & Deployment
+## Android Release Process
 
-* **Current Version**: `v1.0.0-rc.1`
-* **Backend Production Target**: [Railway](https://railway.com) (FastAPI service + managed PostgreSQL). Configured via [`backend/railway.json`](backend/railway.json) with automated pre-deploy migrations.
-* **Mobile Distribution Target**: Directly installable Android APK via [EAS Build](https://expo.dev/eas) (`preview` profile). (iOS/TestFlight is deferred / inactive for v1).
-* For end-to-end deployment procedures, rollbacks, and the 18-step smoke test checklist, see [`docs/06_PRODUCTION_RELEASE_GUIDE.md`](docs/06_PRODUCTION_RELEASE_GUIDE.md).
+* **Development**: GitHub
+* **Backend Production**: [Railway](https://railway.com) (`https://backend-production-a749.up.railway.app` with managed PostgreSQL).
+* **Android Production Distribution**: GitHub Actions -> Standalone Signed APK -> GitHub Releases.
+  * Direct APK download and installation (No Google Play Store dependency).
+  * No Expo/EAS cloud build dependency for final releases.
+  * iOS is deferred / inactive for v1.
+
+### Permanent Signing Identity
+
+All release APKs must be signed with the permanent Friend Ledger release certificate:
+
+```
+SHA-256: f8d2253c6cf772063cc26336fa055bb79e814198aa6660be3a76cc16a202e0dd
+Package: com.erarif.friendledger
+```
+
+> [!WARNING]
+> **CRITICAL**: The Android release keystore must be permanently preserved and never lost or regenerated. If the signing identity changes, Android package manager will reject updates, preventing users from installing newer versions over their existing Friend Ledger installation.
+
+### GitHub Actions CI/CD Secrets
+
+To enable automated release builds via `.github/workflows/android-release.yml`, configure the following GitHub Repository Secrets (Settings -> Secrets and variables -> Actions):
+
+* `ANDROID_KEYSTORE_BASE64`: Base64-encoded string of the release keystore file.
+* `ANDROID_KEYSTORE_PASSWORD`: Keystore password.
+* `ANDROID_KEY_ALIAS`: Key alias name.
+* `ANDROID_KEY_PASSWORD`: Key password.
+
+*(Never document or commit actual secret values. All credentials must remain strictly in encrypted GitHub repository secrets or local gitignored files).*
+
+### Local Release Build
+
+To build a standalone signed release APK locally on Windows:
+
+1. Ensure `mobile/android/keystore.properties` exists (copy from `mobile/keystore.properties.example`) and points to your release keystore.
+2. Ensure JDK 17 and Android SDK are available.
+3. Run the automated build and verification script:
+   ```powershell
+   .\scripts\build-android-release.ps1
+   ```
+4. The script sets the production Railway API, builds `assembleRelease`, verifies the APK with `apksigner`, confirms the signer SHA-256 matches `f8d2253c6cf772063cc26336fa055bb79e814198aa6660be3a76cc16a202e0dd`, and reports the output path:
+   `mobile/android/app/build/outputs/apk/release/app-release.apk`
+
+### Publishing a Release
+
+1. Update `version` and increment `versionCode` in [`mobile/app.json`](mobile/app.json).
+2. Commit the version bump:
+   ```bash
+   git commit -am "chore: bump version to 1.0.0 (versionCode 1)"
+   ```
+3. Create and push a signed tag:
+   ```bash
+   git tag -a v1.0.0 -m "Friend Ledger v1.0.0"
+   git push origin v1.0.0
+   ```
+4. GitHub Actions will build the release APK, verify its permanent signature, generate `SHA256SUMS.txt`, and publish the release to GitHub Releases with `Friend-Ledger-v1.0.0.apk` attached (tags containing `-rc` will be marked as prerelease).
 
 ---
 
